@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>custom ascii converter</title>
+  <!-- If mobile, allow full zoom-out -->
+  <script>
+    if (/Mobi|Android/i.test(navigator.userAgent)) {
+      let meta = document.createElement('meta')
+      meta.name = "viewport"
+      meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
+      document.getElementsByTagName('head')[0].appendChild(meta)
+    }
+  </script>
+  <style>
+    /* dark theme style for mobile and pc */
+    body {
+      margin: 0;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      font-family: monospace;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1em;
+    }
+    button,
+    input {
+      background: #003366;
+      border: none;
+      color: #e0e0e0;
+      padding: 0.5em 1em;
+      margin: 0.5em;
+      font-size: 1em;
+      border-radius: 4px;
+      transition: background 0.3s;
+    }
+    button:hover,
+    input:hover {
+      background: #005599;
+    }
+    pre {
+      white-space: pre;
+      font-size: 1em;
+      line-height: 1em;
+      margin: 0;
+      padding: 1em;
+      width: 90%;
+      overflow-x: auto;
+    }
+    #progressContainer {
+      width: 80%;
+      background: #333;
+      border-radius: 5px;
+      margin: 1em 0;
+      display: none;
+    }
+    #progressBar {
+      height: 20px;
+      width: 0%;
+      background: #005599;
+      border-radius: 5px;
+      transition: width 0.2s;
+    }
+    #progressMessage {
+      margin: 0.5em;
+      font-size: 0.9em;
+    }
+  </style>
+  <!-- FileSaver.js to force download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h3>custom ascii converter</h3>
+    <label>
+      select file
+      <input type="file" id="mediainput" accept="image/*,video/*">
+    </label>
+    <label>
+      detail size (columns)
+      <input type="number" id="detailsize" value="200" min="50" step="50">
+    </label>
+    <div>
+      <button id="customprocess">process</button>
+      <button id="savecustom">save ascii</button>
+    </div>
+    <div id="progressContainer">
+      <div id="progressBar"></div>
+    </div>
+    <div id="progressMessage"></div>
+    <pre id="display"></pre>
+  </div>
+  <script>
+    // custom ascii converter for media only
+    let custommedia = null
+    let customctx = null
+    let customcanvas = document.createElement('canvas')
+    let custommediatype = null
+    const charset = '.,-~:;=!*#$@'
+    const display = document.getElementById('display')
+    const progressContainer = document.getElementById('progressContainer')
+    const progressBar = document.getElementById('progressBar')
+    const progressMessage = document.getElementById('progressMessage')
+
+    // converts the custom media to ascii using the specified detail size.
+    // The canvas width is set to the detail size (which determines the number of characters per line)
+    // and the canvas height is computed from the media's aspect ratio.
+    function customrender () {
+      let detail = parseInt(document.getElementById('detailsize').value) || 200
+      let aspect = 1
+      if (custommedia.naturalWidth) {
+        aspect = custommedia.naturalHeight / custommedia.naturalWidth
+      } else if (custommedia.videoWidth) {
+        aspect = custommedia.videoHeight / custommedia.videoWidth
+      }
+      customcanvas.width = detail
+      customcanvas.height = Math.floor(detail * aspect)
+      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
+      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
+      let output = ''
+      for (let i = 0; i < imgdata.length; i += 4) {
+        let r = imgdata[i]
+        let g = imgdata[i + 1]
+        let b = imgdata[i + 2]
+        let brightness = (r + g + b) / 3
+        let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+        output += charset.charAt(charindex)
+        if (((i / 4) + 1) % customcanvas.width === 0) {
+          output += '\n'
+        }
+      }
+      // Display the ascii art exactly left-to-right, line-by-line
+      display.textContent = output
+      if (custommediatype === 'video') {
+        requestAnimationFrame(customrender)
+      }
+    }
+
+    // simulate a progress bar for saving with confirmation and error handling
+    function simulateProgress(saveFunc) {
+      progressContainer.style.display = 'block'
+      progressBar.style.width = '0%'
+      progressMessage.textContent = 'saving...'
+      let progress = 0
+      const interval = setInterval(() => {
+        progress += 10
+        progressBar.style.width = progress + '%'
+        if (progress >= 100) {
+          clearInterval(interval)
+          try {
+            saveFunc()
+            progressMessage.textContent = 'saved successfully'
+          } catch (e) {
+            progressMessage.textContent = 'error saving file'
+          }
+          setTimeout(() => {
+            progressContainer.style.display = 'none'
+            progressMessage.textContent = ''
+          }, 2000)
+        }
+      }, 100)
+    }
+
+    // save ascii art as a text file using FileSaver.js
+    function savecustomascii () {
+      let ascii = display.textContent
+      if (!ascii || ascii.trim() === '') throw new Error('no ascii generated')
+      let blob = new Blob([ascii], { type: 'text/plain;charset=utf-8' })
+      saveAs(blob, 'ascii_art.txt')
+    }
+
+    // custom process button click
+    document.getElementById('customprocess').addEventListener('click', () => {
+      const fileInput = document.getElementById('mediainput')
+      if (fileInput.files.length === 0) return
+      let file = fileInput.files[0]
+      let url = URL.createObjectURL(file)
+      if (file.type.startsWith('image')) {
+        custommediatype = 'image'
+        custommedia = new Image()
+        custommedia.onload = () => {
+          customcanvas = document.createElement('canvas')
+          customctx = customcanvas.getContext('2d')
+          customrender()
+        }
+        custommedia.src = url
+      } else if (file.type.startsWith('video')) {
+        custommediatype = 'video'
+        custommedia = document.createElement('video')
+        custommedia.autoplay = true
+        custommedia.loop = true
+        custommedia.muted = true
+        custommedia.onloadeddata = () => {
+          customcanvas = document.createElement('canvas')
+          customctx = customcanvas.getContext('2d')
+          customrender()
+        }
+        custommedia.src = url
+        custommedia.play()
+      }
+    })
+
+    // save custom ascii button click with progress bar
+    document.getElementById('savecustom').addEventListener('click', () => {
+      simulateProgress(savecustomascii)
+    })
+  </script>
+</body>
+</html>
