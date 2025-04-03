@@ -3,36 +3,33 @@
 <head>
   <meta charset="utf-8">
   <title>custom ascii converter</title>
-  <!-- allow full zoom-out on mobile; also works in desktop mode -->
   <script>
+    /* allow pinch-zoom and wide viewport on mobile/desktop */
     let meta = document.createElement('meta')
     meta.name = "viewport"
     meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
     document.getElementsByTagName('head')[0].appendChild(meta)
   </script>
   <style>
-    /* dark theme style for mobile and pc */
+    /* dark theme for mobile and pc */
     html, body {
       margin: 0;
       padding: 0;
       background: #0a0a0a;
       color: #e0e0e0;
       font-family: monospace;
-      overflow: hidden;
       width: 100vw;
       height: 100vh;
+      overflow: auto; /* allow scrolling if ascii is taller than the screen */
     }
     .container {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      overflow: visible;
+      /* let the container auto-size and scroll if needed */
+      width: 100%;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-start;
       padding: 1em;
-      box-sizing: border-box;
     }
     button,
     input {
@@ -49,15 +46,16 @@
     input:hover {
       background: #005599;
     }
-    /* The pre element will be scaled dynamically so the whole ascii art fits */
+    /* The pre element is scaled dynamically so the whole ascii art can fit horizontally.
+       We'll allow vertical scrolling if it's super tall. */
     pre {
       white-space: pre;
       font-size: 16px;
       line-height: 16px;
-      margin: 0;
+      margin: 1em 0 0 0;
       padding: 1em;
       transform-origin: top left;
-      /* Well set its width and height dynamically via JS */
+      /* We'll set width/height in JS and transform scale it. */
     }
     #progressContainer {
       width: 80%;
@@ -103,7 +101,7 @@
     <pre id="display"></pre>
   </div>
   <script>
-    // Custom ascii converter for media only
+    // custom ascii converter
     let custommedia = null
     let customctx = null
     let customcanvas = document.createElement('canvas')
@@ -114,27 +112,37 @@
     const progressBar = document.getElementById('progressBar')
     const progressMessage = document.getElementById('progressMessage')
 
-    // Calculate and apply a scale transform so the ascii art fits in the viewport.
+    // scale the ascii so it always fits horizontally, and doesn't get cut off
+    // if it's taller than the viewport, the user can scroll vertically
     function scaleAscii(detail, asciiOutput) {
-      // approximate dimensions per character (in pixels)
+      // approximate pixel size per character
       const charWidth = 10
       const charHeight = 16
-      let artWidth = detail * charWidth
-      let artHeight = asciiOutput.split('\n').length * charHeight
-      // Determine scale factors for both dimensions (viewport size)
-      let scaleX = window.innerWidth / artWidth
-      let scaleY = window.innerHeight / artHeight
-      // Use the smaller scale to ensure the art fits fully
+
+      // width and height in pixels
+      const artWidth = detail * charWidth
+      const lineCount = asciiOutput.split('\n').length
+      const artHeight = lineCount * charHeight
+
+      // scale so it fits in viewport width at least
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+
+      let scaleX = viewportWidth / artWidth
+      let scaleY = viewportHeight / artHeight
+
+      // we only want to shrink if it's bigger than the screen, no upscaling
+      // so we clamp scale to 1 if it's smaller than 1
       let scale = Math.min(scaleX, scaleY)
+      if (scale > 1) {
+        scale = 1
+      }
+
       display.style.transform = 'scale(' + scale + ')'
-      // Also set explicit width and height so that no content is cut off.
       display.style.width = artWidth + 'px'
       display.style.height = artHeight + 'px'
     }
 
-    // Converts the custom media to ascii using the specified detail size.
-    // The canvas width is set to the detail size (which determines the number of characters per line)
-    // and the canvas height is computed from the media's aspect ratio.
     function customrender () {
       let detail = parseInt(document.getElementById('detailsize').value) || 200
       let aspect = 1
@@ -143,9 +151,11 @@
       } else if (custommedia.videoWidth) {
         aspect = custommedia.videoHeight / custommedia.videoWidth
       }
+
       customcanvas.width = detail
       customcanvas.height = Math.floor(detail * aspect)
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
+
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
       let output = ''
       for (let i = 0; i < imgdata.length; i += 4) {
@@ -159,16 +169,14 @@
           output += '\n'
         }
       }
-      // Display the ascii art exactly left-to-right, line-by-line
       display.textContent = output
-      // Scale the ascii output so the whole image is visible in the viewport.
       scaleAscii(detail, output)
+
       if (custommediatype === 'video') {
         requestAnimationFrame(customrender)
       }
     }
 
-    // Simulate a progress bar for saving with confirmation and error handling.
     function simulateProgress(saveFunc) {
       progressContainer.style.display = 'block'
       progressBar.style.width = '0%'
@@ -193,7 +201,6 @@
       }, 100)
     }
 
-    // Save ascii art as a text file using FileSaver.js.
     function savecustomascii () {
       let ascii = display.textContent
       if (!ascii || ascii.trim() === '') throw new Error('no ascii generated')
@@ -201,7 +208,6 @@
       saveAs(blob, 'ascii_art.txt')
     }
 
-    // Custom process button click.
     document.getElementById('customprocess').addEventListener('click', () => {
       const fileInput = document.getElementById('mediainput')
       if (fileInput.files.length === 0) return
@@ -232,7 +238,6 @@
       }
     })
 
-    // Save custom ascii button click with progress bar.
     document.getElementById('savecustom').addEventListener('click', () => {
       simulateProgress(savecustomascii)
     })
