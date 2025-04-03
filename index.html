@@ -3,29 +3,36 @@
 <head>
   <meta charset="utf-8">
   <title>custom ascii converter</title>
-  <!-- If mobile, allow full zoom-out -->
+  <!-- allow full zoom-out on mobile; also works in desktop mode -->
   <script>
-    if (/Mobi|Android/i.test(navigator.userAgent)) {
-      let meta = document.createElement('meta')
-      meta.name = "viewport"
-      // set an initial-scale low enough so that even large ascii outputs are visible
-      meta.content = "width=device-width, initial-scale=0.5, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
-      document.getElementsByTagName('head')[0].appendChild(meta)
-    }
+    let meta = document.createElement('meta')
+    meta.name = "viewport"
+    meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
+    document.getElementsByTagName('head')[0].appendChild(meta)
   </script>
   <style>
     /* dark theme style for mobile and pc */
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
       background: #0a0a0a;
       color: #e0e0e0;
       font-family: monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
     }
     .container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: visible;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: flex-start;
       padding: 1em;
+      box-sizing: border-box;
     }
     button,
     input {
@@ -42,7 +49,7 @@
     input:hover {
       background: #005599;
     }
-    /* The pre element will be scaled so that the entire ascii art is visible */
+    /* The pre element will be scaled dynamically so the whole ascii art fits */
     pre {
       white-space: pre;
       font-size: 16px;
@@ -50,6 +57,7 @@
       margin: 0;
       padding: 1em;
       transform-origin: top left;
+      /* Well set its width and height dynamically via JS */
     }
     #progressContainer {
       width: 80%;
@@ -95,7 +103,7 @@
     <pre id="display"></pre>
   </div>
   <script>
-    // custom ascii converter for media only
+    // Custom ascii converter for media only
     let custommedia = null
     let customctx = null
     let customcanvas = document.createElement('canvas')
@@ -106,25 +114,25 @@
     const progressBar = document.getElementById('progressBar')
     const progressMessage = document.getElementById('progressMessage')
 
-    // After ascii art is generated, scale the <pre> element so it fits the viewport
+    // Calculate and apply a scale transform so the ascii art fits in the viewport.
     function scaleAscii(detail, asciiOutput) {
-      // approximate character dimensions (in pixels)
+      // approximate dimensions per character (in pixels)
       const charWidth = 10
       const charHeight = 16
-      // ascii art width in pixels is detail columns * charWidth
       let artWidth = detail * charWidth
-      // ascii art height is the number of lines * charHeight
-      let lines = asciiOutput.split('\n')
-      let artHeight = lines.length * charHeight
-      // Compute scale factors for width and height
+      let artHeight = asciiOutput.split('\n').length * charHeight
+      // Determine scale factors for both dimensions (viewport size)
       let scaleX = window.innerWidth / artWidth
       let scaleY = window.innerHeight / artHeight
-      let scale = Math.min(scaleX, scaleY, 1)
-      // Apply the scale transform to the pre element
+      // Use the smaller scale to ensure the art fits fully
+      let scale = Math.min(scaleX, scaleY)
       display.style.transform = 'scale(' + scale + ')'
+      // Also set explicit width and height so that no content is cut off.
+      display.style.width = artWidth + 'px'
+      display.style.height = artHeight + 'px'
     }
 
-    // converts the custom media to ascii using the specified detail size.
+    // Converts the custom media to ascii using the specified detail size.
     // The canvas width is set to the detail size (which determines the number of characters per line)
     // and the canvas height is computed from the media's aspect ratio.
     function customrender () {
@@ -153,14 +161,14 @@
       }
       // Display the ascii art exactly left-to-right, line-by-line
       display.textContent = output
-      // scale the ascii output to fit the viewport without scrolling
+      // Scale the ascii output so the whole image is visible in the viewport.
       scaleAscii(detail, output)
       if (custommediatype === 'video') {
         requestAnimationFrame(customrender)
       }
     }
 
-    // simulate a progress bar for saving with confirmation and error handling
+    // Simulate a progress bar for saving with confirmation and error handling.
     function simulateProgress(saveFunc) {
       progressContainer.style.display = 'block'
       progressBar.style.width = '0%'
@@ -185,7 +193,7 @@
       }, 100)
     }
 
-    // save ascii art as a text file using FileSaver.js
+    // Save ascii art as a text file using FileSaver.js.
     function savecustomascii () {
       let ascii = display.textContent
       if (!ascii || ascii.trim() === '') throw new Error('no ascii generated')
@@ -193,7 +201,7 @@
       saveAs(blob, 'ascii_art.txt')
     }
 
-    // custom process button click
+    // Custom process button click.
     document.getElementById('customprocess').addEventListener('click', () => {
       const fileInput = document.getElementById('mediainput')
       if (fileInput.files.length === 0) return
@@ -224,7 +232,7 @@
       }
     })
 
-    // save custom ascii button click with progress bar
+    // Save custom ascii button click with progress bar.
     document.getElementById('savecustom').addEventListener('click', () => {
       simulateProgress(savecustomascii)
     })
