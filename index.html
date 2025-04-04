@@ -11,8 +11,6 @@
       document.getElementsByTagName("head")[0].appendChild(meta)
     }
   </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/whammy@0.2.0/whammy.js"></script>
   <style>
     body {
       margin: 0;
@@ -50,32 +48,34 @@
       width: 90%;
       overflow-x: auto;
     }
-    #progressContainer {
+    #progresscontainer {
       width: 80%;
       background: #333;
       border-radius: 5px;
       margin: 1em 0;
       display: none;
     }
-    #progressBar {
+    #progressbar {
       height: 20px;
       width: 0%;
       background: #005599;
       border-radius: 5px;
       transition: width 0.2s;
     }
-    #progressMessage {
+    #progressmessage {
       margin: 0.5em;
       font-size: 0.9em;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/filesaver/2.0.5/filesaver.min.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 </head>
 <body>
   <div class="container">
     <h3>custom ascii converter</h3>
     <label>
       select file
-      <input type="file" id="mediainput" accept="image/*,video/*">
+      <input type="file" id="mediainput" accept="image/*,video/*,image/gif">
     </label>
     <label>
       detail size columns
@@ -86,10 +86,10 @@
       <button id="savecustom">save ascii</button>
       <button id="togglecolour">toggle colour off</button>
     </div>
-    <div id="progressContainer">
-      <div id="progressBar"></div>
+    <div id="progresscontainer">
+      <div id="progressbar"></div>
     </div>
-    <div id="progressMessage"></div>
+    <div id="progressmessage"></div>
     <pre id="display"></pre>
   </div>
   <canvas id="offcanvas" style="display:none"></canvas>
@@ -101,57 +101,98 @@
     let usecolour = false
     const charset = ".,-~:;=!*#$@"
     const display = document.getElementById("display")
-    const progressContainer = document.getElementById("progressContainer")
-    const progressBar = document.getElementById("progressBar")
-    const progressMessage = document.getElementById("progressMessage")
-    function customrender () {
+    const progresscontainer = document.getElementById("progresscontainer")
+    const progressbar = document.getElementById("progressbar")
+    const progressmessage = document.getElementById("progressmessage")
+    const ffmpeg = ffmpegLib.createFFmpeg({log:true})
+    async function loadffmpeg() {
+      if(!ffmpeg.isLoaded()){
+        await ffmpeg.load()
+      }
+    }
+    function customrender() {
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = 1
-      if (custommedia.naturalWidth) {
+      if(custommedia.naturalWidth){
         aspect = custommedia.naturalHeight / custommedia.naturalWidth
-      } else if (custommedia.videoWidth) {
+      } else if(custommedia.videoWidth){
         aspect = custommedia.videoHeight / custommedia.videoWidth
       }
       customcanvas.width = detail
       customcanvas.height = Math.floor(detail * aspect)
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
-      if (usecolour) {
+      if(usecolour){
         let htmlout = ""
-        for (let y = 0; y < customcanvas.height; y++) {
-          for (let x = 0; x < customcanvas.width; x++) {
+        for(let y = 0; y < customcanvas.height; y++){
+          for(let x = 0; x < customcanvas.width; x++){
             let i = (y * customcanvas.width + x) * 4
             let r = imgdata[i]
-            let g = imgdata[i + 1]
-            let b = imgdata[i + 2]
-            let brightness = (r + g + b) / 3
-            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+            let g = imgdata[i+1]
+            let b = imgdata[i+2]
+            let brightness = (r+g+b)/3
+            let charindex = Math.floor((brightness/255) * (charset.length-1))
             let char = charset.charAt(charindex)
-            htmlout += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
+            htmlout += "<span style=\"color: rgb("+r+","+g+","+b+")\">"+char+"</span>"
           }
           htmlout += "<br>"
         }
         display.innerHTML = htmlout
       } else {
         let textout = ""
-        for (let i = 0; i < imgdata.length; i += 4) {
+        for(let i = 0; i < imgdata.length; i += 4){
           let r = imgdata[i]
-          let g = imgdata[i + 1]
-          let b = imgdata[i + 2]
-          let brightness = (r + g + b) / 3
-          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          let g = imgdata[i+1]
+          let b = imgdata[i+2]
+          let brightness = (r+g+b)/3
+          let charindex = Math.floor((brightness/255) * (charset.length-1))
           textout += charset.charAt(charindex)
-          if (((i / 4) + 1) % customcanvas.width === 0) {
+          if(((i/4)+1) % customcanvas.width === 0){
             textout += "\n"
           }
         }
         display.textContent = textout
       }
-      if (custommediatype === "video") {
+      if(custommediatype === "video" || custommediatype === "gif"){
         requestAnimationFrame(customrender)
       }
     }
-    function saveasciiasimg () {
+    function generate_ascii_frame(detail) {
+      let aspect = 1
+      if(custommedia.videoWidth){
+        aspect = custommedia.videoHeight / custommedia.videoWidth
+      } else if(custommedia.naturalWidth){
+        aspect = custommedia.naturalHeight / custommedia.naturalWidth
+      }
+      customcanvas.width = detail
+      customcanvas.height = Math.floor(detail * aspect)
+      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
+      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
+      let rows = customcanvas.height, cols = customcanvas.width
+      let font_size = 10, line_height = font_size * 1.2
+      let offcanvas = document.createElement("canvas")
+      offcanvas.width = cols * font_size * 0.6
+      offcanvas.height = rows * line_height
+      let offctx = offcanvas.getContext("2d")
+      offctx.fillStyle = "#0a0a0a"
+      offctx.fillRect(0, 0, offcanvas.width, offcanvas.height)
+      offctx.font = font_size + "px monospace"
+      for(let y = 0; y < rows; y++){
+        for(let x = 0; x < cols; x++){
+          let i = (y * cols + x) * 4
+          let r = imgdata[i]
+          let g = imgdata[i+1]
+          let b = imgdata[i+2]
+          let brightness = (r+g+b)/3
+          let charindex = Math.floor((brightness/255) * (charset.length-1))
+          let char = charset.charAt(charindex)
+          offctx.fillStyle = usecolour ? "rgb("+r+","+g+","+b+")" : "#e0e0e0"
+          offctx.fillText(char, x * font_size * 0.6, (y+1) * line_height)
+        }
+      }
+      return offcanvas
+    }
+    async function saveasciiasimg() {
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = custommedia.naturalWidth ? custommedia.naturalHeight / custommedia.naturalWidth : 1
       customcanvas.width = detail
@@ -167,82 +208,52 @@
       offctx.fillStyle = "#0a0a0a"
       offctx.fillRect(0, 0, offcanvas.width, offcanvas.height)
       offctx.font = font_size + "px monospace"
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
+      for(let y = 0; y < rows; y++){
+        for(let x = 0; x < cols; x++){
           let i = (y * cols + x) * 4
           let r = imgdata[i]
-          let g = imgdata[i + 1]
-          let b = imgdata[i + 2]
-          let brightness = (r + g + b) / 3
-          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          let g = imgdata[i+1]
+          let b = imgdata[i+2]
+          let brightness = (r+g+b)/3
+          let charindex = Math.floor((brightness/255) * (charset.length-1))
           let char = charset.charAt(charindex)
-          offctx.fillStyle = usecolour ? "rgb(" + r + "," + g + "," + b + ")" : "#e0e0e0"
-          offctx.fillText(char, x * font_size * 0.6, (y + 1) * line_height)
+          offctx.fillStyle = usecolour ? "rgb("+r+","+g+","+b+")" : "#e0e0e0"
+          offctx.fillText(char, x * font_size * 0.6, (y+1) * line_height)
         }
       }
       offcanvas.toBlob(blob => {
         saveAs(blob, "ascii_art.png")
       })
     }
-    function generate_ascii_frame (detail) {
-      let aspect = custommedia.videoWidth ? custommedia.videoHeight / custommedia.videoWidth : 1
-      customcanvas.width = detail
-      customcanvas.height = Math.floor(detail * aspect)
-      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
-      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
-      let rows = customcanvas.height, cols = customcanvas.width
-      let font_size = 10, line_height = font_size * 1.2
-      let offcanvas = document.createElement("canvas")
-      offcanvas.width = cols * font_size * 0.6
-      offcanvas.height = rows * line_height
-      let offctx = offcanvas.getContext("2d")
-      offctx.fillStyle = "#0a0a0a"
-      offctx.fillRect(0, 0, offcanvas.width, offcanvas.height)
-      offctx.font = font_size + "px monospace"
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          let i = (y * cols + x) * 4
-          let r = imgdata[i]
-          let g = imgdata[i + 1]
-          let b = imgdata[i + 2]
-          let brightness = (r + g + b) / 3
-          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-          let char = charset.charAt(charindex)
-          offctx.fillStyle = usecolour ? "rgb(" + r + "," + g + "," + b + ")" : "#e0e0e0"
-          offctx.fillText(char, x * font_size * 0.6, (y + 1) * line_height)
-        }
-      }
-      return offcanvas
-    }
-    async function saveasciiasvideo_framebyframe () {
-      if (!custommedia.duration) throw new Error("video not loaded")
+    async function saveasciiasvideo_framebyframe() {
+      if(!custommedia.duration) throw new Error("video not loaded")
+      await loadffmpeg()
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let frame_rate = 25
       let total_frames = Math.floor(custommedia.duration * frame_rate)
-      let encoder = new Whammy.Video(frame_rate)
-      progressContainer.style.display = "block"
-      for (let frame = 0; frame < total_frames; frame++) {
+      for(let frame = 0; frame < total_frames; frame++){
         custommedia.currentTime = frame / frame_rate
-        await new Promise(resolve => {
-          custommedia.onseeked = resolve
-        })
+        await new Promise(resolve => { custommedia.onseeked = resolve })
         let frame_canvas = generate_ascii_frame(detail)
-        encoder.add(frame_canvas)
+        let dataUrl = frame_canvas.toDataURL("image/png")
+        let data = dataUrl.split(",")[1]
+        ffmpeg.FS("writeFile", "frame" + String(frame).padStart(4, "0") + ".png", Uint8Array.from(atob(data), c => c.charCodeAt(0)))
         let percentage = Math.floor(((frame + 1) / total_frames) * 100)
-        progressBar.style.width = percentage + "%"
-        progressMessage.textContent = (frame + 1) + "/" + total_frames + " frames (" + percentage + "%)"
+        progressbar.style.width = percentage + "%"
+        progressmessage.textContent = (frame + 1) + "/" + total_frames + " frames (" + percentage + "%)"
       }
-      let output_blob = encoder.compile()
-      saveAs(output_blob, "ascii_art.webm")
-      progressContainer.style.display = "none"
-      progressMessage.textContent = ""
+      await ffmpeg.run("-framerate", String(frame_rate), "-i", "frame%04d.png", "-c:v", "libx264", "-pix_fmt", "yuv420p", "output.mp4")
+      let data = ffmpeg.FS("readFile", "output.mp4")
+      saveAs(new Blob([data.buffer], { type: "video/mp4" }), "ascii_art.mp4")
+      progresscontainer.style.display = "none"
+      progressmessage.textContent = ""
     }
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileInput = document.getElementById("mediainput")
-      if (fileInput.files.length === 0) return
+      if(fileInput.files.length === 0) return
       let file = fileInput.files[0]
       let url = URL.createObjectURL(file)
-      if (file.type.startsWith("image")) {
+      if(file.type.startsWith("image") && file.type !== "image/gif"){
         custommediatype = "image"
         custommedia = new Image()
         custommedia.onload = () => {
@@ -251,8 +262,8 @@
           customrender()
         }
         custommedia.src = url
-      } else if (file.type.startsWith("video")) {
-        custommediatype = "video"
+      } else {
+        custommediatype = file.type === "image/gif" ? "gif" : "video"
         custommedia = document.createElement("video")
         custommedia.autoplay = true
         custommedia.loop = true
@@ -267,16 +278,16 @@
       }
     })
     document.getElementById("savecustom").addEventListener("click", async () => {
-      if (custommediatype === "video") {
+      if(custommediatype === "video" || custommediatype === "gif"){
         await saveasciiasvideo_framebyframe()
       } else {
         saveasciiasimg()
       }
     })
-    document.getElementById("togglecolour").addEventListener("click", function () {
+    document.getElementById("togglecolour").addEventListener("click", function(){
       usecolour = !usecolour
       this.textContent = usecolour ? "toggle colour on" : "toggle colour off"
-      if (custommedia) {
+      if(custommedia){
         customrender()
       }
     })
