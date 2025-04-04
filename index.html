@@ -97,6 +97,7 @@
     let customcanvas = document.createElement("canvas")
     let custommediatype = null
     let usecolour = false
+    let asciiData = []
     const charset = ".,-~:;=!*#$@"
     const display = document.getElementById("display")
     const progressContainer = document.getElementById("progressContainer")
@@ -114,9 +115,11 @@
       customcanvas.height = Math.floor(detail * aspect)
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
+      asciiData = []
       if (usecolour) {
-        let output = ""
+        let htmlout = ""
         for (let y = 0; y < customcanvas.height; y++) {
+          let row = []
           for (let x = 0; x < customcanvas.width; x++) {
             let i = (y * customcanvas.width + x) * 4
             let r = imgdata[i]
@@ -125,29 +128,105 @@
             let brightness = (r + g + b) / 3
             let charindex = Math.floor((brightness / 255) * (charset.length - 1))
             let char = charset.charAt(charindex)
-            output += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
+            row.push({char: char, color: "rgb(" + r + "," + g + "," + b + ")"})
+            htmlout += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
           }
-          output += "<br>"
+          asciiData.push(row)
+          htmlout += "<br>"
         }
-        display.innerHTML = output
+        display.innerHTML = htmlout
       } else {
-        let output = ""
-        for (let i = 0; i < imgdata.length; i += 4) {
-          let r = imgdata[i]
-          let g = imgdata[i + 1]
-          let b = imgdata[i + 2]
-          let brightness = (r + g + b) / 3
-          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-          output += charset.charAt(charindex)
-          if (((i / 4) + 1) % customcanvas.width === 0) {
-            output += "\n"
+        let textout = ""
+        for (let y = 0; y < customcanvas.height; y++) {
+          let row = []
+          for (let x = 0; x < customcanvas.width; x++) {
+            let i = (y * customcanvas.width + x) * 4
+            let r = imgdata[i]
+            let g = imgdata[i + 1]
+            let b = imgdata[i + 2]
+            let brightness = (r + g + b) / 3
+            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+            let char = charset.charAt(charindex)
+            row.push({char: char, color: "#e0e0e0"})
+            textout += char
           }
+          asciiData.push(row)
+          textout += "\n"
         }
-        display.textContent = output
+        display.textContent = textout
       }
       if (custommediatype === "video") {
         requestAnimationFrame(customrender)
       }
+    }
+    function saveasciiasimg () {
+      if (!asciiData.length) throw new Error("no ascii generated")
+      let rows = asciiData.length
+      let cols = asciiData[0].length
+      let fontSize = 10
+      let lineHeight = fontSize * 1.2
+      let canvasw = cols * fontSize * 0.6
+      let canvash = rows * lineHeight
+      let offcanvas = document.createElement("canvas")
+      offcanvas.width = canvasw
+      offcanvas.height = canvash
+      let offctx = offcanvas.getContext("2d")
+      offctx.fillStyle = "#0a0a0a"
+      offctx.fillRect(0, 0, canvasw, canvash)
+      offctx.font = fontSize + "px monospace"
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          let obj = asciiData[y][x]
+          offctx.fillStyle = obj.color
+          offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
+        }
+      }
+      offcanvas.toBlob(blob => {
+        saveAs(blob, "ascii_art.png")
+      })
+    }
+    function saveasciiasvideo () {
+      if (!asciiData.length) throw new Error("no ascii generated")
+      let rows = asciiData.length
+      let cols = asciiData[0].length
+      let fontSize = 10
+      let lineHeight = fontSize * 1.2
+      let canvasw = cols * fontSize * 0.6
+      let canvash = rows * lineHeight
+      let offcanvas = document.createElement("canvas")
+      offcanvas.width = canvasw
+      offcanvas.height = canvash
+      let offctx = offcanvas.getContext("2d")
+      offctx.font = fontSize + "px monospace"
+      let stream = offcanvas.captureStream(25)
+      let recordedChunks = []
+      let recorder = new MediaRecorder(stream, {mimeType: "video/webm"})
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data)
+      }
+      recorder.onstop = () => {
+        let blob = new Blob(recordedChunks, {type: "video/webm"})
+        saveAs(blob, "ascii_art.webm")
+      }
+      recorder.start()
+      let frameCount = 0
+      let totalFrames = 75
+      let interval = setInterval(() => {
+        offctx.fillStyle = "#0a0a0a"
+        offctx.fillRect(0, 0, canvasw, canvash)
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            let obj = asciiData[y][x]
+            offctx.fillStyle = obj.color
+            offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
+          }
+        }
+        frameCount++
+        if (frameCount >= totalFrames) {
+          clearInterval(interval)
+          recorder.stop()
+        }
+      }, 40)
     }
     function simulateProgress (saveFunc) {
       progressContainer.style.display = "block"
@@ -171,12 +250,6 @@
           }, 2000)
         }
       }, 100)
-    }
-    function savecustomascii () {
-      let ascii = display.textContent
-      if (!ascii || ascii.trim() === "") throw new Error("no ascii generated")
-      let blob = new Blob([ascii], { type: "text/plain;charset=utf-8" })
-      saveAs(blob, "ascii_art.txt")
     }
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileInput = document.getElementById("mediainput")
@@ -208,7 +281,11 @@
       }
     })
     document.getElementById("savecustom").addEventListener("click", () => {
-      simulateProgress(savecustomascii)
+      if (custommediatype === "video") {
+        simulateProgress(saveasciiasvideo)
+      } else {
+        simulateProgress(saveasciiasimg)
+      }
     })
     document.getElementById("togglecolour").addEventListener("click", function () {
       usecolour = !usecolour
@@ -219,4 +296,4 @@
     })
   </script>
 </body>
-</html>
+  </html>
