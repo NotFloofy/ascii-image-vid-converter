@@ -7,10 +7,12 @@
     if (/mobi|android/i.test(navigator.userAgent)) {
       let meta = document.createElement("meta")
       meta.name = "viewport"
-      meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
+      meta.content = "width=device-width,initial-scale=1,minimum-scale=0.1,maximum-scale=5,user-scalable=yes"
       document.getElementsByTagName("head")[0].appendChild(meta)
     }
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/file-saver/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/whammy@0.2.0/whammy.js"></script>
   <style>
     body {
       margin: 0;
@@ -67,7 +69,6 @@
       font-size: 0.9em;
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -91,13 +92,13 @@
     <div id="progressMessage"></div>
     <pre id="display"></pre>
   </div>
+  <canvas id="offcanvas" style="display:none"></canvas>
   <script>
     let custommedia = null
     let customctx = null
     let customcanvas = document.createElement("canvas")
     let custommediatype = null
     let usecolour = false
-    let asciiData = []
     const charset = ".,-~:;=!*#$@"
     const display = document.getElementById("display")
     const progressContainer = document.getElementById("progressContainer")
@@ -115,11 +116,9 @@
       customcanvas.height = Math.floor(detail * aspect)
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
-      asciiData = []
       if (usecolour) {
         let htmlout = ""
         for (let y = 0; y < customcanvas.height; y++) {
-          let row = []
           for (let x = 0; x < customcanvas.width; x++) {
             let i = (y * customcanvas.width + x) * 4
             let r = imgdata[i]
@@ -128,30 +127,23 @@
             let brightness = (r + g + b) / 3
             let charindex = Math.floor((brightness / 255) * (charset.length - 1))
             let char = charset.charAt(charindex)
-            row.push({char: char, color: "rgb(" + r + "," + g + "," + b + ")"})
             htmlout += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
           }
-          asciiData.push(row)
           htmlout += "<br>"
         }
         display.innerHTML = htmlout
       } else {
         let textout = ""
-        for (let y = 0; y < customcanvas.height; y++) {
-          let row = []
-          for (let x = 0; x < customcanvas.width; x++) {
-            let i = (y * customcanvas.width + x) * 4
-            let r = imgdata[i]
-            let g = imgdata[i + 1]
-            let b = imgdata[i + 2]
-            let brightness = (r + g + b) / 3
-            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-            let char = charset.charAt(charindex)
-            row.push({char: char, color: "#e0e0e0"})
-            textout += char
+        for (let i = 0; i < imgdata.length; i += 4) {
+          let r = imgdata[i]
+          let g = imgdata[i + 1]
+          let b = imgdata[i + 2]
+          let brightness = (r + g + b) / 3
+          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          textout += charset.charAt(charindex)
+          if (((i / 4) + 1) % customcanvas.width === 0) {
+            textout += "\n"
           }
-          asciiData.push(row)
-          textout += "\n"
         }
         display.textContent = textout
       }
@@ -160,96 +152,90 @@
       }
     }
     function saveasciiasimg () {
-      if (!asciiData.length) throw new Error("no ascii generated")
-      let rows = asciiData.length
-      let cols = asciiData[0].length
-      let fontSize = 10
-      let lineHeight = fontSize * 1.2
-      let canvasw = cols * fontSize * 0.6
-      let canvash = rows * lineHeight
+      let detail = parseInt(document.getElementById("detailsize").value) || 200
+      let aspect = custommedia.naturalWidth ? custommedia.naturalHeight / custommedia.naturalWidth : 1
+      customcanvas.width = detail
+      customcanvas.height = Math.floor(detail * aspect)
+      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
+      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
+      let rows = customcanvas.height, cols = customcanvas.width
+      let font_size = 10, line_height = font_size * 1.2
       let offcanvas = document.createElement("canvas")
-      offcanvas.width = canvasw
-      offcanvas.height = canvash
+      offcanvas.width = cols * font_size * 0.6
+      offcanvas.height = rows * line_height
       let offctx = offcanvas.getContext("2d")
       offctx.fillStyle = "#0a0a0a"
-      offctx.fillRect(0, 0, canvasw, canvash)
-      offctx.font = fontSize + "px monospace"
+      offctx.fillRect(0, 0, offcanvas.width, offcanvas.height)
+      offctx.font = font_size + "px monospace"
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          let obj = asciiData[y][x]
-          offctx.fillStyle = obj.color
-          offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
+          let i = (y * cols + x) * 4
+          let r = imgdata[i]
+          let g = imgdata[i + 1]
+          let b = imgdata[i + 2]
+          let brightness = (r + g + b) / 3
+          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          let char = charset.charAt(charindex)
+          offctx.fillStyle = usecolour ? "rgb(" + r + "," + g + "," + b + ")" : "#e0e0e0"
+          offctx.fillText(char, x * font_size * 0.6, (y + 1) * line_height)
         }
       }
       offcanvas.toBlob(blob => {
         saveAs(blob, "ascii_art.png")
       })
     }
-    function saveasciiasvideo () {
-      if (!asciiData.length) throw new Error("no ascii generated")
-      let rows = asciiData.length
-      let cols = asciiData[0].length
-      let fontSize = 10
-      let lineHeight = fontSize * 1.2
-      let canvasw = cols * fontSize * 0.6
-      let canvash = rows * lineHeight
+    function generate_ascii_frame (detail) {
+      let aspect = custommedia.videoWidth ? custommedia.videoHeight / custommedia.videoWidth : 1
+      customcanvas.width = detail
+      customcanvas.height = Math.floor(detail * aspect)
+      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
+      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
+      let rows = customcanvas.height, cols = customcanvas.width
+      let font_size = 10, line_height = font_size * 1.2
       let offcanvas = document.createElement("canvas")
-      offcanvas.width = canvasw
-      offcanvas.height = canvash
+      offcanvas.width = cols * font_size * 0.6
+      offcanvas.height = rows * line_height
       let offctx = offcanvas.getContext("2d")
-      offctx.font = fontSize + "px monospace"
-      let stream = offcanvas.captureStream(25)
-      let recordedChunks = []
-      let recorder = new MediaRecorder(stream, {mimeType: "video/webm"})
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data)
-      }
-      recorder.onstop = () => {
-        let blob = new Blob(recordedChunks, {type: "video/webm"})
-        saveAs(blob, "ascii_art.webm")
-      }
-      recorder.start()
-      let frameCount = 0
-      let totalFrames = 75
-      let interval = setInterval(() => {
-        offctx.fillStyle = "#0a0a0a"
-        offctx.fillRect(0, 0, canvasw, canvash)
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            let obj = asciiData[y][x]
-            offctx.fillStyle = obj.color
-            offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
-          }
+      offctx.fillStyle = "#0a0a0a"
+      offctx.fillRect(0, 0, offcanvas.width, offcanvas.height)
+      offctx.font = font_size + "px monospace"
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          let i = (y * cols + x) * 4
+          let r = imgdata[i]
+          let g = imgdata[i + 1]
+          let b = imgdata[i + 2]
+          let brightness = (r + g + b) / 3
+          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          let char = charset.charAt(charindex)
+          offctx.fillStyle = usecolour ? "rgb(" + r + "," + g + "," + b + ")" : "#e0e0e0"
+          offctx.fillText(char, x * font_size * 0.6, (y + 1) * line_height)
         }
-        frameCount++
-        if (frameCount >= totalFrames) {
-          clearInterval(interval)
-          recorder.stop()
-        }
-      }, 40)
+      }
+      return offcanvas
     }
-    function simulateProgress (saveFunc) {
+    async function saveasciiasvideo_framebyframe () {
+      if (!custommedia.duration) throw new Error("video not loaded")
+      let detail = parseInt(document.getElementById("detailsize").value) || 200
+      let frame_rate = 25
+      let total_frames = Math.floor(custommedia.duration * frame_rate)
+      let encoder = new Whammy.Video(frame_rate)
       progressContainer.style.display = "block"
-      progressBar.style.width = "0%"
-      progressMessage.textContent = "saving"
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += 10
-        progressBar.style.width = progress + "%"
-        if (progress >= 100) {
-          clearInterval(interval)
-          try {
-            saveFunc()
-            progressMessage.textContent = "saved successfully"
-          } catch (e) {
-            progressMessage.textContent = "error saving file"
-          }
-          setTimeout(() => {
-            progressContainer.style.display = "none"
-            progressMessage.textContent = ""
-          }, 2000)
-        }
-      }, 100)
+      for (let frame = 0; frame < total_frames; frame++) {
+        custommedia.currentTime = frame / frame_rate
+        await new Promise(resolve => {
+          custommedia.onseeked = resolve
+        })
+        let frame_canvas = generate_ascii_frame(detail)
+        encoder.add(frame_canvas)
+        let percentage = Math.floor(((frame + 1) / total_frames) * 100)
+        progressBar.style.width = percentage + "%"
+        progressMessage.textContent = (frame + 1) + "/" + total_frames + " frames (" + percentage + "%)"
+      }
+      let output_blob = encoder.compile()
+      saveAs(output_blob, "ascii_art.webm")
+      progressContainer.style.display = "none"
+      progressMessage.textContent = ""
     }
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileInput = document.getElementById("mediainput")
@@ -280,11 +266,11 @@
         custommedia.play()
       }
     })
-    document.getElementById("savecustom").addEventListener("click", () => {
+    document.getElementById("savecustom").addEventListener("click", async () => {
       if (custommediatype === "video") {
-        simulateProgress(saveasciiasvideo)
+        await saveasciiasvideo_framebyframe()
       } else {
-        simulateProgress(saveasciiasimg)
+        saveasciiasimg()
       }
     })
     document.getElementById("togglecolour").addEventListener("click", function () {
