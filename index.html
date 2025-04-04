@@ -4,28 +4,21 @@
   <meta charset="utf-8">
   <title>custom ascii converter</title>
   <script>
-    /* allow pinch-zoom and wide viewport on mobile/desktop */
-    let meta = document.createElement('meta')
-    meta.name = "viewport"
-    meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
-    document.getElementsByTagName('head')[0].appendChild(meta)
+    if (/mobi|android/i.test(navigator.userAgent)) {
+      let meta = document.createElement("meta")
+      meta.name = "viewport"
+      meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
+      document.getElementsByTagName("head")[0].appendChild(meta)
+    }
   </script>
   <style>
-    /* dark theme for mobile and pc */
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
       background: #0a0a0a;
       color: #e0e0e0;
       font-family: monospace;
-      width: 100vw;
-      height: 100vh;
-      overflow: auto; /* allow scrolling if ascii is taller than the screen */
     }
     .container {
-      /* let the container auto-size and scroll if needed */
-      width: 100%;
-      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -46,16 +39,14 @@
     input:hover {
       background: #005599;
     }
-    /* The pre element is scaled dynamically so the whole ascii art can fit horizontally.
-       We'll allow vertical scrolling if it's super tall. */
     pre {
       white-space: pre;
-      font-size: 16px;
-      line-height: 16px;
-      margin: 1em 0 0 0;
+      font-size: 1em;
+      line-height: 1em;
+      margin: 0;
       padding: 1em;
-      transform-origin: top left;
-      /* We'll set width/height in JS and transform scale it. */
+      width: 90%;
+      overflow-x: auto;
     }
     #progressContainer {
       width: 80%;
@@ -76,7 +67,6 @@
       font-size: 0.9em;
     }
   </style>
-  <!-- FileSaver.js to force download -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
@@ -87,12 +77,13 @@
       <input type="file" id="mediainput" accept="image/*,video/*">
     </label>
     <label>
-      detail size (columns)
+      detail size columns
       <input type="number" id="detailsize" value="200" min="50" step="50">
     </label>
     <div>
       <button id="customprocess">process</button>
       <button id="savecustom">save ascii</button>
+      <button id="togglecolour">toggle colour off</button>
     </div>
     <div id="progressContainer">
       <div id="progressBar"></div>
@@ -101,146 +92,131 @@
     <pre id="display"></pre>
   </div>
   <script>
-    // custom ascii converter
     let custommedia = null
     let customctx = null
-    let customcanvas = document.createElement('canvas')
+    let customcanvas = document.createElement("canvas")
     let custommediatype = null
-    const charset = '.,-~:;=!*#$@'
-    const display = document.getElementById('display')
-    const progressContainer = document.getElementById('progressContainer')
-    const progressBar = document.getElementById('progressBar')
-    const progressMessage = document.getElementById('progressMessage')
-
-    // scale the ascii so it always fits horizontally, and doesn't get cut off
-    // if it's taller than the viewport, the user can scroll vertically
-    function scaleAscii(detail, asciiOutput) {
-      // approximate pixel size per character
-      const charWidth = 10
-      const charHeight = 16
-
-      // width and height in pixels
-      const artWidth = detail * charWidth
-      const lineCount = asciiOutput.split('\n').length
-      const artHeight = lineCount * charHeight
-
-      // scale so it fits in viewport width at least
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-
-      let scaleX = viewportWidth / artWidth
-      let scaleY = viewportHeight / artHeight
-
-      // we only want to shrink if it's bigger than the screen, no upscaling
-      // so we clamp scale to 1 if it's smaller than 1
-      let scale = Math.min(scaleX, scaleY)
-      if (scale > 1) {
-        scale = 1
-      }
-
-      display.style.transform = 'scale(' + scale + ')'
-      display.style.width = artWidth + 'px'
-      display.style.height = artHeight + 'px'
-    }
-
+    let usecolour = false
+    const charset = ".,-~:;=!*#$@"
+    const display = document.getElementById("display")
+    const progressContainer = document.getElementById("progressContainer")
+    const progressBar = document.getElementById("progressBar")
+    const progressMessage = document.getElementById("progressMessage")
     function customrender () {
-      let detail = parseInt(document.getElementById('detailsize').value) || 200
+      let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = 1
       if (custommedia.naturalWidth) {
         aspect = custommedia.naturalHeight / custommedia.naturalWidth
       } else if (custommedia.videoWidth) {
         aspect = custommedia.videoHeight / custommedia.videoWidth
       }
-
       customcanvas.width = detail
       customcanvas.height = Math.floor(detail * aspect)
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
-
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
-      let output = ''
-      for (let i = 0; i < imgdata.length; i += 4) {
-        let r = imgdata[i]
-        let g = imgdata[i + 1]
-        let b = imgdata[i + 2]
-        let brightness = (r + g + b) / 3
-        let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-        output += charset.charAt(charindex)
-        if (((i / 4) + 1) % customcanvas.width === 0) {
-          output += '\n'
+      if (usecolour) {
+        let output = ""
+        for (let y = 0; y < customcanvas.height; y++) {
+          for (let x = 0; x < customcanvas.width; x++) {
+            let i = (y * customcanvas.width + x) * 4
+            let r = imgdata[i]
+            let g = imgdata[i + 1]
+            let b = imgdata[i + 2]
+            let brightness = (r + g + b) / 3
+            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+            let char = charset.charAt(charindex)
+            output += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
+          }
+          output += "<br>"
         }
+        display.innerHTML = output
+      } else {
+        let output = ""
+        for (let i = 0; i < imgdata.length; i += 4) {
+          let r = imgdata[i]
+          let g = imgdata[i + 1]
+          let b = imgdata[i + 2]
+          let brightness = (r + g + b) / 3
+          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          output += charset.charAt(charindex)
+          if (((i / 4) + 1) % customcanvas.width === 0) {
+            output += "\n"
+          }
+        }
+        display.textContent = output
       }
-      display.textContent = output
-      scaleAscii(detail, output)
-
-      if (custommediatype === 'video') {
+      if (custommediatype === "video") {
         requestAnimationFrame(customrender)
       }
     }
-
-    function simulateProgress(saveFunc) {
-      progressContainer.style.display = 'block'
-      progressBar.style.width = '0%'
-      progressMessage.textContent = 'saving...'
+    function simulateProgress (saveFunc) {
+      progressContainer.style.display = "block"
+      progressBar.style.width = "0%"
+      progressMessage.textContent = "saving"
       let progress = 0
       const interval = setInterval(() => {
         progress += 10
-        progressBar.style.width = progress + '%'
+        progressBar.style.width = progress + "%"
         if (progress >= 100) {
           clearInterval(interval)
           try {
             saveFunc()
-            progressMessage.textContent = 'saved successfully'
+            progressMessage.textContent = "saved successfully"
           } catch (e) {
-            progressMessage.textContent = 'error saving file'
+            progressMessage.textContent = "error saving file"
           }
           setTimeout(() => {
-            progressContainer.style.display = 'none'
-            progressMessage.textContent = ''
+            progressContainer.style.display = "none"
+            progressMessage.textContent = ""
           }, 2000)
         }
       }, 100)
     }
-
     function savecustomascii () {
       let ascii = display.textContent
-      if (!ascii || ascii.trim() === '') throw new Error('no ascii generated')
-      let blob = new Blob([ascii], { type: 'text/plain;charset=utf-8' })
-      saveAs(blob, 'ascii_art.txt')
+      if (!ascii || ascii.trim() === "") throw new Error("no ascii generated")
+      let blob = new Blob([ascii], { type: "text/plain;charset=utf-8" })
+      saveAs(blob, "ascii_art.txt")
     }
-
-    document.getElementById('customprocess').addEventListener('click', () => {
-      const fileInput = document.getElementById('mediainput')
+    document.getElementById("customprocess").addEventListener("click", () => {
+      const fileInput = document.getElementById("mediainput")
       if (fileInput.files.length === 0) return
       let file = fileInput.files[0]
       let url = URL.createObjectURL(file)
-      if (file.type.startsWith('image')) {
-        custommediatype = 'image'
+      if (file.type.startsWith("image")) {
+        custommediatype = "image"
         custommedia = new Image()
         custommedia.onload = () => {
-          customcanvas = document.createElement('canvas')
-          customctx = customcanvas.getContext('2d')
+          customcanvas = document.createElement("canvas")
+          customctx = customcanvas.getContext("2d")
           customrender()
         }
         custommedia.src = url
-      } else if (file.type.startsWith('video')) {
-        custommediatype = 'video'
-        custommedia = document.createElement('video')
+      } else if (file.type.startsWith("video")) {
+        custommediatype = "video"
+        custommedia = document.createElement("video")
         custommedia.autoplay = true
         custommedia.loop = true
         custommedia.muted = true
         custommedia.onloadeddata = () => {
-          customcanvas = document.createElement('canvas')
-          customctx = customcanvas.getContext('2d')
+          customcanvas = document.createElement("canvas")
+          customctx = customcanvas.getContext("2d")
           customrender()
         }
         custommedia.src = url
         custommedia.play()
       }
     })
-
-    document.getElementById('savecustom').addEventListener('click', () => {
+    document.getElementById("savecustom").addEventListener("click", () => {
       simulateProgress(savecustomascii)
+    })
+    document.getElementById("togglecolour").addEventListener("click", function () {
+      usecolour = !usecolour
+      this.textContent = usecolour ? "toggle colour on" : "toggle colour off"
+      if (custommedia) {
+        customrender()
+      }
     })
   </script>
 </body>
-  </html>
+</html>
