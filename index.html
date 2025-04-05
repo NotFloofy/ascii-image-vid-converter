@@ -83,7 +83,7 @@
     <div>
       <button id="customprocess">process</button>
       <button id="savecustom">save ascii</button>
-      <button id="togglecolour">toggle colour off</button>
+      <button id="togglecolour">toggle colour on</button>
     </div>
     <div id="progressContainer">
       <div id="progressBar"></div>
@@ -125,7 +125,7 @@
             let r = imgdata[i]
             let g = imgdata[i + 1]
             let b = imgdata[i + 2]
-            let brightness = (r + g + b) / 3
+            let brightness = 0.299 * r + 0.587 * g + 0.114 * b
             let charindex = Math.floor((brightness / 255) * (charset.length - 1))
             let char = charset.charAt(charindex)
             row.push({char: char, color: "rgb(" + r + "," + g + "," + b + ")"})
@@ -144,7 +144,7 @@
             let r = imgdata[i]
             let g = imgdata[i + 1]
             let b = imgdata[i + 2]
-            let brightness = (r + g + b) / 3
+            let brightness = 0.299 * r + 0.587 * g + 0.114 * b
             let charindex = Math.floor((brightness / 255) * (charset.length - 1))
             let char = charset.charAt(charindex)
             row.push({char: char, color: "#e0e0e0"})
@@ -163,22 +163,22 @@
       if (!asciiData.length) throw new Error("no ascii generated")
       let rows = asciiData.length
       let cols = asciiData[0].length
-      let fontSize = 10
-      let lineHeight = fontSize * 1.2
-      let canvasw = cols * fontSize * 0.6
-      let canvash = rows * lineHeight
+      let fontsize = 10
+      let lineheight = fontsize * 1.2
+      let canvasw = cols * fontsize * 0.6
+      let canvash = rows * lineheight
       let offcanvas = document.createElement("canvas")
       offcanvas.width = canvasw
       offcanvas.height = canvash
       let offctx = offcanvas.getContext("2d")
       offctx.fillStyle = "#0a0a0a"
       offctx.fillRect(0, 0, canvasw, canvash)
-      offctx.font = fontSize + "px monospace"
+      offctx.font = fontsize + "px monospace"
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           let obj = asciiData[y][x]
           offctx.fillStyle = obj.color
-          offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
+          offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
         }
       }
       offcanvas.toBlob(blob => {
@@ -189,28 +189,28 @@
       if (!asciiData.length) throw new Error("no ascii generated")
       let rows = asciiData.length
       let cols = asciiData[0].length
-      let fontSize = 10
-      let lineHeight = fontSize * 1.2
-      let canvasw = cols * fontSize * 0.6
-      let canvash = rows * lineHeight
+      let fontsize = 10
+      let lineheight = fontsize * 1.2
+      let canvasw = cols * fontsize * 0.6
+      let canvash = rows * lineheight
       let offcanvas = document.createElement("canvas")
       offcanvas.width = canvasw
       offcanvas.height = canvash
       let offctx = offcanvas.getContext("2d")
-      offctx.font = fontSize + "px monospace"
+      offctx.font = fontsize + "px monospace"
       let stream = offcanvas.captureStream(25)
-      let recordedChunks = []
+      let recordedchunks = []
       let recorder = new MediaRecorder(stream, {mimeType: "video/webm"})
       recorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedChunks.push(e.data)
+        if (e.data.size > 0) recordedchunks.push(e.data)
       }
       recorder.onstop = () => {
-        let blob = new Blob(recordedChunks, {type: "video/webm"})
+        let blob = new Blob(recordedchunks, {type: "video/webm"})
         saveAs(blob, "ascii_art.webm")
       }
       recorder.start()
-      let frameCount = 0
-      let totalFrames = 75
+      let framecount = 0
+      let totalframes = 75
       let interval = setInterval(() => {
         offctx.fillStyle = "#0a0a0a"
         offctx.fillRect(0, 0, canvasw, canvash)
@@ -218,17 +218,17 @@
           for (let x = 0; x < cols; x++) {
             let obj = asciiData[y][x]
             offctx.fillStyle = obj.color
-            offctx.fillText(obj.char, x * fontSize * 0.6, (y + 1) * lineHeight)
+            offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
           }
         }
-        frameCount++
-        if (frameCount >= totalFrames) {
+        framecount++
+        if (framecount >= totalframes) {
           clearInterval(interval)
           recorder.stop()
         }
       }, 40)
     }
-    function simulateProgress (saveFunc) {
+    function simulateprogress (savefunc) {
       progressContainer.style.display = "block"
       progressBar.style.width = "0%"
       progressMessage.textContent = "saving"
@@ -239,7 +239,7 @@
         if (progress >= 100) {
           clearInterval(interval)
           try {
-            saveFunc()
+            savefunc()
             progressMessage.textContent = "saved successfully"
           } catch (e) {
             progressMessage.textContent = "error saving file"
@@ -252,9 +252,9 @@
       }, 100)
     }
     document.getElementById("customprocess").addEventListener("click", () => {
-      const fileInput = document.getElementById("mediainput")
-      if (fileInput.files.length === 0) return
-      let file = fileInput.files[0]
+      const fileinput = document.getElementById("mediainput")
+      if (fileinput.files.length === 0) return
+      let file = fileinput.files[0]
       let url = URL.createObjectURL(file)
       if (file.type.startsWith("image")) {
         custommediatype = "image"
@@ -282,14 +282,14 @@
     })
     document.getElementById("savecustom").addEventListener("click", () => {
       if (custommediatype === "video") {
-        simulateProgress(saveasciiasvideo)
+        simulateprogress(saveasciiasvideo)
       } else {
-        simulateProgress(saveasciiasimg)
+        simulateprogress(saveasciiasimg)
       }
     })
     document.getElementById("togglecolour").addEventListener("click", function () {
       usecolour = !usecolour
-      this.textContent = usecolour ? "toggle colour on" : "toggle colour off"
+      this.textContent = usecolour ? "toggle colour off" : "toggle colour on"
       if (custommedia) {
         customrender()
       }
