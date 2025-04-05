@@ -48,26 +48,27 @@
       width: 90%;
       overflow-x: auto;
     }
-    #progressContainer {
+    #progresscontainer {
       width: 80%;
       background: #333;
       border-radius: 5px;
       margin: 1em 0;
       display: none;
     }
-    #progressBar {
+    #progressbar {
       height: 20px;
       width: 0%;
       background: #005599;
       border-radius: 5px;
       transition: width 0.2s;
     }
-    #progressMessage {
+    #progressmessage {
       margin: 0.5em;
       font-size: 0.9em;
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -85,17 +86,10 @@
       <button id="savecustom">save ascii</button>
       <button id="togglecolour">colour mode off</button>
     </div>
-    <label>
-      youtube link
-      <input type="text" id="ytlink" placeholder="enter youtube link">
-    </label>
-    <div>
-      <button id="ytplay">play from youtube link</button>
+    <div id="progresscontainer">
+      <div id="progressbar"></div>
     </div>
-    <div id="progressContainer">
-      <div id="progressBar"></div>
-    </div>
-    <div id="progressMessage"></div>
+    <div id="progressmessage"></div>
     <pre id="display"></pre>
   </div>
   <script>
@@ -107,9 +101,9 @@
     let asciiData = []
     const charset = ".,-~:;=!*#$@"
     const display = document.getElementById("display")
-    const progressContainer = document.getElementById("progressContainer")
-    const progressBar = document.getElementById("progressBar")
-    const progressMessage = document.getElementById("progressMessage")
+    const progresscontainer = document.getElementById("progresscontainer")
+    const progressbar = document.getElementById("progressbar")
+    const progressmessage = document.getElementById("progressmessage")
     function customrender () {
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = 1
@@ -192,7 +186,7 @@
         saveAs(blob, "ascii_art.png")
       })
     }
-    function saveasciiasvideo () {
+    async function saveasciiasvideomp4 () {
       if (!asciiData.length) throw new Error("no ascii generated")
       let rows = asciiData.length
       let cols = asciiData[0].length
@@ -204,34 +198,11 @@
       offcanvas.width = canvasw
       offcanvas.height = canvash
       let offctx = offcanvas.getContext("2d")
-      offctx.font = fontsize + "px monospace"
-      let stream = offcanvas.captureStream(25)
-      let recordedchunks = []
-      let options = {mimeType: "video/webm;codecs=vp9"}
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options.mimeType = "video/webm;codecs=vp8"
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-          options.mimeType = "video/webm"
-        }
-      }
-      let recorder = new MediaRecorder(stream, options)
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) recordedchunks.push(e.data)
-      }
-      recorder.onstop = () => {
-        let blob = new Blob(recordedchunks, {type: options.mimeType})
-        saveAs(blob, "ascii_art.webm")
-        progressMessage.textContent = "saved successfully"
-        setTimeout(() => {
-          progressContainer.style.display = "none"
-          progressMessage.textContent = ""
-        }, 2000)
-      }
-      recorder.start()
-      let framecount = 0
-      let totalframes = 75
-      progressContainer.style.display = "block"
-      function recordFrame () {
+      let totalframes = 150
+      let fps = 25
+      let frameimages = []
+      let starttime = performance.now()
+      for (let frame = 0; frame < totalframes; frame++) {
         offctx.fillStyle = "#0a0a0a"
         offctx.fillRect(0, 0, canvasw, canvash)
         for (let y = 0; y < rows; y++) {
@@ -241,15 +212,35 @@
             offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
           }
         }
-        framecount++
-        progressBar.style.width = (framecount / totalframes * 100) + "%"
-        if (framecount < totalframes) {
-          requestAnimationFrame(recordFrame)
-        } else {
-          recorder.stop()
-        }
+        let dataurl = offcanvas.toDataURL("image/png")
+        frameimages.push(dataurl)
+        let elapsed = performance.now() - starttime
+        let avg = elapsed / (frame + 1)
+        let remaining = avg * (totalframes - frame - 1)
+        let percent = Math.floor(((frame + 1) / totalframes) * 100)
+        progressbar.style.width = percent + "%"
+        progressmessage.textContent = "frame " + (frame + 1) + "/" + totalframes + " " + percent + "% estimated time " + Math.floor(remaining / 1000) + " sec"
+        await new Promise(r => requestAnimationFrame(r))
       }
-      recordFrame()
+      progressmessage.textContent = "encoding video please wait"
+      const {createffmpeg, fetchfile} = ffmpeg
+      const ffmpeginst = createffmpeg({log: false})
+      await ffmpeginst.load()
+      for (let i = 0; i < frameimages.length; i++) {
+        let filename = ("000" + i).slice(-3) + ".png"
+        let res = await fetch(frameimages[i])
+        let data = await res.arrayBuffer()
+        ffmpeginst.FS("writeFile", filename, new Uint8Array(data))
+      }
+      await ffmpeginst.run("-r", ""+fps, "-i", "%03d.png", "-c:v", "libx264", "-pix_fmt", "yuv420p", "out.mp4")
+      let data = ffmpeginst.FS("readFile", "out.mp4")
+      let mp4blob = new Blob([data.buffer], {type: "video/mp4"})
+      saveAs(mp4blob, "ascii_art.mp4")
+      progressmessage.textContent = "saved successfully"
+      setTimeout(() => {
+        progresscontainer.style.display = "none"
+        progressmessage.textContent = ""
+      }, 2000)
     }
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileinput = document.getElementById("mediainput")
@@ -283,36 +274,11 @@
         custommedia.play()
       }
     })
-    document.getElementById("ytplay").addEventListener("click", () => {
-      let ytlink = document.getElementById("ytlink").value.trim()
-      if (!ytlink) return
-      let videoid = ""
-      let match = ytlink.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
-      if (match) {
-        videoid = match[1]
-      } else {
-        return
-      }
-      custommediatype = "video"
-      document.getElementById("savecustom").textContent = "render"
-      let yturl = "https://www.youtube.com/embed/" + videoid + "?autoplay=1&mute=1"
-      custommedia = document.createElement("iframe")
-      custommedia.setAttribute("allow", "autoplay")
-      custommedia.style.display = "none"
-      custommedia.onload = () => {
-        // note: due to cross-origin policy, drawing from a youtube iframe may not work
-        // this option is experimental and may not produce ascii art
-        customcanvas = document.createElement("canvas")
-        customctx = customcanvas.getContext("2d")
-        // try to load the iframe content if allowed
-        customrender()
-      }
-      custommedia.src = yturl
-      document.body.appendChild(custommedia)
-    })
     document.getElementById("savecustom").addEventListener("click", () => {
       if (custommediatype === "video") {
-        saveasciiasvideo()
+        progresscontainer.style.display = "block"
+        progressbar.style.width = "0%"
+        saveasciiasvideomp4()
       } else {
         saveasciiasimg()
       }
