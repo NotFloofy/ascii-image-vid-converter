@@ -7,7 +7,7 @@
     if (/mobi|android/i.test(navigator.userAgent)) {
       let meta = document.createElement("meta")
       meta.name = "viewport"
-      meta.content = "width=device-width, initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes"
+      meta.content = "width=device-width,initial-scale=1,minimum-scale=0.1,maximum-scale=5,user-scalable=yes"
       document.getElementsByTagName("head")[0].appendChild(meta)
     }
   </script>
@@ -85,6 +85,13 @@
       <button id="savecustom">save ascii</button>
       <button id="togglecolour">colour mode off</button>
     </div>
+    <label>
+      youtube link
+      <input type="text" id="ytlink" placeholder="enter youtube link">
+    </label>
+    <div>
+      <button id="ytplay">play from youtube link</button>
+    </div>
     <div id="progressContainer">
       <div id="progressBar"></div>
     </div>
@@ -106,10 +113,10 @@
     function customrender () {
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = 1
-      if (custommedia.naturalWidth) {
-        aspect = custommedia.naturalHeight / custommedia.naturalWidth
-      } else if (custommedia.videoWidth) {
+      if (custommedia.videoWidth && custommedia.videoHeight) {
         aspect = custommedia.videoHeight / custommedia.videoWidth
+      } else if (custommedia.naturalWidth && custommedia.naturalHeight) {
+        aspect = custommedia.naturalHeight / custommedia.naturalWidth
       }
       customcanvas.width = detail
       customcanvas.height = Math.floor(detail * aspect)
@@ -214,11 +221,17 @@
       recorder.onstop = () => {
         let blob = new Blob(recordedchunks, {type: options.mimeType})
         saveAs(blob, "ascii_art.webm")
+        progressMessage.textContent = "saved successfully"
+        setTimeout(() => {
+          progressContainer.style.display = "none"
+          progressMessage.textContent = ""
+        }, 2000)
       }
       recorder.start()
       let framecount = 0
       let totalframes = 75
-      let interval = setInterval(() => {
+      progressContainer.style.display = "block"
+      function recordFrame () {
         offctx.fillStyle = "#0a0a0a"
         offctx.fillRect(0, 0, canvasw, canvash)
         for (let y = 0; y < rows; y++) {
@@ -229,34 +242,14 @@
           }
         }
         framecount++
-        if (framecount >= totalframes) {
-          clearInterval(interval)
+        progressBar.style.width = (framecount / totalframes * 100) + "%"
+        if (framecount < totalframes) {
+          requestAnimationFrame(recordFrame)
+        } else {
           recorder.stop()
         }
-      }, 40)
-    }
-    function simulateprogress (savefunc) {
-      progressContainer.style.display = "block"
-      progressBar.style.width = "0%"
-      progressMessage.textContent = "saving"
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += 10
-        progressBar.style.width = progress + "%"
-        if (progress >= 100) {
-          clearInterval(interval)
-          try {
-            savefunc()
-            progressMessage.textContent = "saved successfully"
-          } catch (e) {
-            progressMessage.textContent = "error saving file"
-          }
-          setTimeout(() => {
-            progressContainer.style.display = "none"
-            progressMessage.textContent = ""
-          }, 2000)
-        }
-      }, 100)
+      }
+      recordFrame()
     }
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileinput = document.getElementById("mediainput")
@@ -277,6 +270,7 @@
         custommediatype = "video"
         document.getElementById("savecustom").textContent = "render"
         custommedia = document.createElement("video")
+        custommedia.crossOrigin = "anonymous"
         custommedia.autoplay = true
         custommedia.loop = true
         custommedia.muted = true
@@ -289,11 +283,38 @@
         custommedia.play()
       }
     })
+    document.getElementById("ytplay").addEventListener("click", () => {
+      let ytlink = document.getElementById("ytlink").value.trim()
+      if (!ytlink) return
+      let videoid = ""
+      let match = ytlink.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
+      if (match) {
+        videoid = match[1]
+      } else {
+        return
+      }
+      custommediatype = "video"
+      document.getElementById("savecustom").textContent = "render"
+      let yturl = "https://www.youtube.com/embed/" + videoid + "?autoplay=1&mute=1"
+      custommedia = document.createElement("iframe")
+      custommedia.setAttribute("allow", "autoplay")
+      custommedia.style.display = "none"
+      custommedia.onload = () => {
+        // note: due to cross-origin policy, drawing from a youtube iframe may not work
+        // this option is experimental and may not produce ascii art
+        customcanvas = document.createElement("canvas")
+        customctx = customcanvas.getContext("2d")
+        // try to load the iframe content if allowed
+        customrender()
+      }
+      custommedia.src = yturl
+      document.body.appendChild(custommedia)
+    })
     document.getElementById("savecustom").addEventListener("click", () => {
       if (custommediatype === "video") {
-        simulateprogress(saveasciiasvideo)
+        saveasciiasvideo()
       } else {
-        simulateprogress(saveasciiasimg)
+        saveasciiasimg()
       }
     })
     document.getElementById("togglecolour").addEventListener("click", function () {
