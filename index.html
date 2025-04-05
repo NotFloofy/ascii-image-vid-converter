@@ -68,7 +68,6 @@
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -104,6 +103,14 @@
     const progresscontainer = document.getElementById("progresscontainer")
     const progressbar = document.getElementById("progressbar")
     const progressmessage = document.getElementById("progressmessage")
+    
+    // create a hidden canvas for recording the ascii view
+    let recordingCanvas = document.createElement("canvas")
+    let recordingCtx = recordingCanvas.getContext("2d")
+    recordingCanvas.style.display = "none"
+    document.body.appendChild(recordingCanvas)
+    
+    // render ascii art on both the display (via innerHTML) and the recording canvas
     function customrender () {
       let detail = parseInt(document.getElementById("detailsize").value) || 200
       let aspect = 1
@@ -117,131 +124,89 @@
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
       asciiData = []
-      if (usecolour) {
-        let htmlout = ""
-        for (let y = 0; y < customcanvas.height; y++) {
-          let row = []
-          for (let x = 0; x < customcanvas.width; x++) {
-            let i = (y * customcanvas.width + x) * 4
-            let r = imgdata[i]
-            let g = imgdata[i + 1]
-            let b = imgdata[i + 2]
-            let brightness = 0.299 * r + 0.587 * g + 0.114 * b
-            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-            let char = charset.charAt(charindex)
+      let htmlout = ""
+      for (let y = 0; y < customcanvas.height; y++) {
+        let row = []
+        for (let x = 0; x < customcanvas.width; x++) {
+          let i = (y * customcanvas.width + x) * 4
+          let r = imgdata[i]
+          let g = imgdata[i + 1]
+          let b = imgdata[i + 2]
+          let brightness = 0.299 * r + 0.587 * g + 0.114 * b
+          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
+          let char = charset.charAt(charindex)
+          if (usecolour) {
             row.push({char: char, color: "rgb(" + r + "," + g + "," + b + ")"})
             htmlout += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
-          }
-          asciiData.push(row)
-          htmlout += "<br>"
-        }
-        display.innerHTML = htmlout
-      } else {
-        let textout = ""
-        for (let y = 0; y < customcanvas.height; y++) {
-          let row = []
-          for (let x = 0; x < customcanvas.width; x++) {
-            let i = (y * customcanvas.width + x) * 4
-            let r = imgdata[i]
-            let g = imgdata[i + 1]
-            let b = imgdata[i + 2]
-            let brightness = 0.299 * r + 0.587 * g + 0.114 * b
-            let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-            let char = charset.charAt(charindex)
+          } else {
             row.push({char: char, color: "#e0e0e0"})
-            textout += char
+            htmlout += char
           }
-          asciiData.push(row)
-          textout += "\n"
         }
-        display.textContent = textout
+        asciiData.push(row)
+        htmlout += "<br>"
       }
+      display.innerHTML = htmlout
+      
+      // update the recording canvas to match the ascii art
+      recordingCanvas.width = customcanvas.width * 10 * 0.6  // scale factor for clarity
+      recordingCanvas.height = customcanvas.height * 12     // approximate line height
+      recordingCtx.fillStyle = "#0a0a0a"
+      recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height)
+      recordingCtx.font = "10px monospace"
+      for (let y = 0; y < asciiData.length; y++) {
+        for (let x = 0; x < asciiData[y].length; x++) {
+          let obj = asciiData[y][x]
+          recordingCtx.fillStyle = obj.color
+          recordingCtx.fillText(obj.char, x * 10 * 0.6, (y + 1) * 12)
+        }
+      }
+      
       if (custommediatype === "video") {
         requestAnimationFrame(customrender)
       }
     }
-    function saveasciiasimg () {
-      if (!asciiData.length) throw new Error("no ascii generated")
-      let rows = asciiData.length
-      let cols = asciiData[0].length
-      let fontsize = 10
-      let lineheight = fontsize * 1.2
-      let canvasw = cols * fontsize * 0.6
-      let canvash = rows * lineheight
-      let offcanvas = document.createElement("canvas")
-      offcanvas.width = canvasw
-      offcanvas.height = canvash
-      let offctx = offcanvas.getContext("2d")
-      offctx.fillStyle = "#0a0a0a"
-      offctx.fillRect(0, 0, canvasw, canvash)
-      offctx.font = fontsize + "px monospace"
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          let obj = asciiData[y][x]
-          offctx.fillStyle = obj.color
-          offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
-        }
+    
+    // record the ascii rendering in real time using MediaRecorder from the recording canvas
+    function recordAsciiVideo () {
+      // try using a mp4 mimeType if supported
+      let options = {mimeType: "video/mp4;codecs=avc1.42E01E"}
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options = {mimeType: "video/mp4"}
       }
-      offcanvas.toBlob(blob => {
-        saveAs(blob, "ascii_art.png")
-      })
-    }
-    async function saveasciiasvideomp4 () {
-      if (!asciiData.length) throw new Error("no ascii generated")
-      let rows = asciiData.length
-      let cols = asciiData[0].length
-      let fontsize = 10
-      let lineheight = fontsize * 1.2
-      let canvasw = cols * fontsize * 0.6
-      let canvash = rows * lineheight
-      let offcanvas = document.createElement("canvas")
-      offcanvas.width = canvasw
-      offcanvas.height = canvash
-      let offctx = offcanvas.getContext("2d")
-      let totalframes = 150
-      let fps = 25
-      let frameimages = []
-      let starttime = performance.now()
-      for (let frame = 0; frame < totalframes; frame++) {
-        offctx.fillStyle = "#0a0a0a"
-        offctx.fillRect(0, 0, canvasw, canvash)
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            let obj = asciiData[y][x]
-            offctx.fillStyle = obj.color
-            offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
-          }
-        }
-        let dataurl = offcanvas.toDataURL("image/png")
-        frameimages.push(dataurl)
-        let elapsed = performance.now() - starttime
-        let avg = elapsed / (frame + 1)
-        let remaining = avg * (totalframes - frame - 1)
-        let percent = Math.floor(((frame + 1) / totalframes) * 100)
+      let stream = recordingCanvas.captureStream()
+      let recorder = new MediaRecorder(stream, options)
+      let chunks = []
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+      recorder.onstop = () => {
+        let blob = new Blob(chunks, {type: options.mimeType})
+        saveAs(blob, "ascii_art.mp4")
+      }
+      // use video duration if available, else default to 5 seconds
+      let totalTime = custommediatype === "video" && custommedia.duration ? custommedia.duration * 1000 : 5000
+      let startTime = Date.now()
+      recorder.start()
+      progresscontainer.style.display = "block"
+      let progressInterval = setInterval(() => {
+        let elapsed = Date.now() - startTime
+        let percent = Math.min(Math.floor((elapsed / totalTime) * 100), 100)
+        let remaining = Math.max(totalTime - elapsed, 0)
         progressbar.style.width = percent + "%"
-        progressmessage.textContent = "frame " + (frame + 1) + "/" + totalframes + " " + percent + "% estimated time " + Math.floor(remaining / 1000) + " sec"
-        await new Promise(r => requestAnimationFrame(r))
-      }
-      progressmessage.textContent = "encoding video please wait"
-      const {createffmpeg, fetchfile} = ffmpeg
-      const ffmpeginst = createffmpeg({log: false})
-      await ffmpeginst.load()
-      for (let i = 0; i < frameimages.length; i++) {
-        let filename = ("000" + i).slice(-3) + ".png"
-        let res = await fetch(frameimages[i])
-        let data = await res.arrayBuffer()
-        ffmpeginst.FS("writeFile", filename, new Uint8Array(data))
-      }
-      await ffmpeginst.run("-r", ""+fps, "-i", "%03d.png", "-c:v", "libx264", "-pix_fmt", "yuv420p", "out.mp4")
-      let data = ffmpeginst.FS("readFile", "out.mp4")
-      let mp4blob = new Blob([data.buffer], {type: "video/mp4"})
-      saveAs(mp4blob, "ascii_art.mp4")
-      progressmessage.textContent = "saved successfully"
-      setTimeout(() => {
-        progresscontainer.style.display = "none"
-        progressmessage.textContent = ""
-      }, 2000)
+        progressmessage.textContent = "time: " + Math.floor(elapsed/1000) + " sec done, " + Math.floor(remaining/1000) + " sec left, " + percent + "%"
+        if (elapsed >= totalTime) {
+          clearInterval(progressInterval)
+          recorder.stop()
+          progressmessage.textContent = "encoding complete"
+          setTimeout(() => {
+            progresscontainer.style.display = "none"
+            progressmessage.textContent = ""
+          }, 2000)
+        }
+      }, 500)
     }
+    
     document.getElementById("customprocess").addEventListener("click", () => {
       const fileinput = document.getElementById("mediainput")
       if (fileinput.files.length === 0) return
@@ -263,7 +228,7 @@
         custommedia = document.createElement("video")
         custommedia.crossOrigin = "anonymous"
         custommedia.autoplay = true
-        custommedia.loop = true
+        custommedia.loop = false
         custommedia.muted = true
         custommedia.onloadeddata = () => {
           customcanvas = document.createElement("canvas")
@@ -274,21 +239,42 @@
         custommedia.play()
       }
     })
+    
     document.getElementById("savecustom").addEventListener("click", () => {
       if (custommediatype === "video") {
-        progresscontainer.style.display = "block"
-        progressbar.style.width = "0%"
-        saveasciiasvideomp4()
+        recordAsciiVideo()
       } else {
-        saveasciiasimg()
+        // for images, just save a snapshot
+        let rows = asciiData.length
+        let cols = asciiData[0].length
+        let fontsize = 10
+        let lineheight = fontsize * 1.2
+        let canvasw = cols * fontsize * 0.6
+        let canvash = rows * lineheight
+        let offcanvas = document.createElement("canvas")
+        offcanvas.width = canvasw
+        offcanvas.height = canvash
+        let offctx = offcanvas.getContext("2d")
+        offctx.fillStyle = "#0a0a0a"
+        offctx.fillRect(0, 0, canvasw, canvash)
+        offctx.font = fontsize + "px monospace"
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            let obj = asciiData[y][x]
+            offctx.fillStyle = obj.color
+            offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
+          }
+        }
+        offcanvas.toBlob(blob => {
+          saveAs(blob, "ascii_art.png")
+        })
       }
     })
+    
     document.getElementById("togglecolour").addEventListener("click", function () {
       usecolour = !usecolour
       this.textContent = usecolour ? "colour mode on" : "colour mode off"
-      if (custommedia) {
-        customrender()
-      }
+      if (custommedia) customrender()
     })
   </script>
 </body>
