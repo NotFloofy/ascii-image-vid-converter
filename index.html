@@ -83,7 +83,7 @@
     <div>
       <button id="customprocess">process</button>
       <button id="savecustom">save ascii</button>
-      <button id="togglecolour">toggle colour on</button>
+      <button id="togglecolour">colour mode off</button>
     </div>
     <div id="progressContainer">
       <div id="progressBar"></div>
@@ -200,12 +200,19 @@
       offctx.font = fontsize + "px monospace"
       let stream = offcanvas.captureStream(25)
       let recordedchunks = []
-      let recorder = new MediaRecorder(stream, {mimeType: "video/webm"})
+      let options = {mimeType: "video/webm;codecs=vp9"}
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = "video/webm;codecs=vp8"
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          options.mimeType = "video/webm"
+        }
+      }
+      let recorder = new MediaRecorder(stream, options)
       recorder.ondataavailable = e => {
         if (e.data.size > 0) recordedchunks.push(e.data)
       }
       recorder.onstop = () => {
-        let blob = new Blob(recordedchunks, {type: "video/webm"})
+        let blob = new Blob(recordedchunks, {type: options.mimeType})
         saveAs(blob, "ascii_art.webm")
       }
       recorder.start()
@@ -258,6 +265,7 @@
       let url = URL.createObjectURL(file)
       if (file.type.startsWith("image")) {
         custommediatype = "image"
+        document.getElementById("savecustom").textContent = "save ascii"
         custommedia = new Image()
         custommedia.onload = () => {
           customcanvas = document.createElement("canvas")
@@ -267,6 +275,7 @@
         custommedia.src = url
       } else if (file.type.startsWith("video")) {
         custommediatype = "video"
+        document.getElementById("savecustom").textContent = "render"
         custommedia = document.createElement("video")
         custommedia.autoplay = true
         custommedia.loop = true
@@ -289,7 +298,7 @@
     })
     document.getElementById("togglecolour").addEventListener("click", function () {
       usecolour = !usecolour
-      this.textContent = usecolour ? "toggle colour off" : "toggle colour on"
+      this.textContent = usecolour ? "colour mode on" : "colour mode off"
       if (custommedia) {
         customrender()
       }
