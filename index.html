@@ -1,304 +1,316 @@
 <!doctype html>
+
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>custom ascii converter</title>
-  <meta name="viewport" content="width=device-width initial-scale=1 minimum-scale=0.1 maximum-scale=5 user-scalable=yes">
-  <style>
-    body {
-      margin:0
-      background:#0a0a0a
-      color:#e0e0e0
-      font-family:monospace
-    }
-    .container {
-      display:flex
-      flex-direction:column
-      align-items:center
-      padding:1em
-    }
-    button,input {
-      background:#003366
-      border:none
-      color:#e0e0e0
-      padding:0.5em 1em
-      margin:0.5em
-      font-size:1em
-      border-radius:4px
-      transition:background 0.3s
-    }
-    button:hover,input:hover {
-      background:#005599
-    }
-    #closebtn {
-      position:absolute
-      top:0.5em
-      right:0.5em
-      background:#cc0000
-      width:2em
-      height:2em
-      line-height:2em
-      text-align:center
-      border-radius:50%
-      cursor:pointer
-      user-select:none
-    }
-    .movable {
-      position:absolute
-      touch-action:none
-    }
-    pre {
-      white-space:pre
-      font-size:1em
-      line-height:1em
-      margin:0
-      padding:1em
-      width:90%
-      overflow-x:auto
-    }
-    #progresscontainer {
-      width:80%
-      background:#333
-      border-radius:5px
-      margin:1em 0
-      display:none
-    }
-    #progressbar {
-      height:20px
-      width:0%
-      background:#005599
-      border-radius:5px
-      transition:width 0.2s
-    }
-    #errormessages {
-      color:#ff6666
-      font-size:0.8em
-      max-height:100px
-      overflow:auto
-      width:90%
-      margin-top:1em
-    }
-  </style>
-</head>
-<body>
-  <div class="container movable" id="mainui">
-    <div id="closebtn">x</div>
-    <h3>custom ascii converter</h3>
-    <label>select file
-      <input type="file" id="mediainput" accept="image/*,video/*">
-    </label>
-    <label>detail size columns
-      <input type="number" id="detailsize" value="200" min="50" step="50">
-    </label>
-    <label>render fps
-      <input type="number" id="renderfps" value="30" min="1">
-    </label>
-    <div>
-      <button id="startprocess">process</button>
-      <button id="saveascii">save ascii</button>
-      <button id="togglecolour">colour mode off</button>
+  <head>
+    <meta charset="utf-8">
+    <title>custom ascii converter</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=0.1,maximum-scale=5,user-scalable=yes">
+    <style>
+      body {
+        margin: 0;
+        background: #0a0a0a;
+        color: #e0e0e0;
+        font-family: monospace;
+      }
+      .container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1em;
+      }
+      #closebtn {
+        position: absolute;
+        top: 0.5em;
+        right: 0.5em;
+        background: #330000;
+        color: #e0e0e0;
+        width: 1.5em;
+        height: 1.5em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 0.25em;
+        cursor: pointer;
+      }
+      button,
+      input {
+        background: #003366;
+        border: none;
+        color: #e0e0e0;
+        padding: 0.5em 1em;
+        margin: 0.5em;
+        font-size: 1em;
+        border-radius: 4px;
+        transition: background 0.3s;
+      }
+      button:hover,
+      input:hover {
+        background: #005599;
+      }
+      #detailsize,
+      #renderfps {
+        width: 4em;
+      }
+      pre {
+        background: #111122;
+        border: 1px solid #222244;
+        border-radius: 8px;
+        padding: 1em;
+        box-shadow: 0 0 10px #000a;
+        white-space: pre;
+        font-size: 1em;
+        line-height: 1em;
+        margin: 0;
+        width: 90%;
+        overflow-x: auto;
+      }
+      #progresscontainer {
+        width: 80%;
+        background: #333;
+        border-radius: 5px;
+        margin: 1em 0;
+        display: none;
+      }
+      #progressbar {
+        height: 20px;
+        width: 0%;
+        background: #005599;
+        border-radius: 5px;
+        transition: width 0.2s;
+      }
+      #progressmessage {
+        margin: 0.5em;
+        font-size: 0.9em;
+      }
+      #errormessages {
+        color: #ff6666;
+        font-size: 0.8em;
+        max-height: 100px;
+        overflow: auto;
+        width: 90%;
+        margin-top: 1em;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  </head>
+  <body>
+    <div class="container" id="mainui">
+      <div id="closebtn">x</div>
+      <h3>custom ascii converter</h3>
+      <label>
+        select file
+        <input type="file" id="mediainput" accept="image/*,video/*">
+      </label>
+      <label>
+        detail size columns
+        <input type="number" id="detailsize" value="200" min="50" step="50">
+      </label>
+      <label>
+        render fps
+        <input type="number" id="renderfps" value="30" min="1">
+      </label>
+      <div>
+        <button id="startprocess">process</button>
+        <button id="saveascii">save ascii</button>
+        <button id="togglecolour">colour mode off</button>
+      </div>
+      <div id="progresscontainer">
+        <div id="progressbar"></div>
+      </div>
+      <div id="progressmessage"></div>
+      <pre id="display"></pre>
+      <div id="errormessages"></div>
     </div>
-    <div id="progresscontainer">
-      <div id="progressbar"></div>
-    </div>
-    <div id="progressmessage"></div>
-    <pre id="display"></pre>
-    <div id="errormessages"></div>
-  </div>
-  <script>
-    let media=null
-    let ctx=null
-    let canv=document.createElement('canvas')
-    let mediatype=null
-    let usecolour=false
-    let ascii=[]
-    let lasttime=0
+    <script>
+      let media = null
+      let ctx = null
+      let canv = document.createElement('canvas')
+      let mediatype = null
+      let usecolour = false
+      let ascii = []
+      let lasttime = 0window.onerror = function(msg, url, line) {
+    let e = document.getElementById('errormessages')
+    e.textContent += msg + ' at ' + line + '\n'
+  }
 
-    window.onerror=function(msg,url,line){
-      let e=document.getElementById('errormessages')
-      e.textContent+=msg+' at '+line+'\\n'
+  function asciiheartbeat(time) {
+    try {
+      let fps = parseInt(document.getElementById('renderfps').value) || 30
+      if (mediatype === 'video' && media.duration) {
+        let est = media.getVideoPlaybackQuality().totalVideoFrames > 0 ? Math.floor(media.getVideoPlaybackQuality().totalVideoFrames / media.duration) : fps
+        fps = Math.min(fps, est)
+        document.getElementById('renderfps').max = est
+      }
+      if (time - lasttime < 1000 / fps) return window.requestAnimationFrame(asciiheartbeat)
+      lasttime = time
+      let detail = parseInt(document.getElementById('detailsize').value) || 200
+      let aspect = media.videoWidth ? media.videoHeight / media.videoWidth : media.naturalHeight / media.naturalWidth
+      canv.width = detail
+      canv.height = Math.floor(detail * aspect)
+      ctx.drawImage(media, 0, 0, canv.width, canv.height)
+      let d = ctx.getImageData(0, 0, canv.width, canv.height).data
+      ascii = []
+      let out = ''
+      let chars = '.,-~:;=!*#$@'
+      for (let y = 0; y < canv.height; y++) {
+        let row = []
+        for (let x = 0; x < canv.width; x++) {
+          let i = (y * canv.width + x) * 4
+          let r = d[i], g = d[i + 1], b = d[i + 2]
+          let bri = 0.299 * r + 0.587 * g + 0.114 * b
+          let idx = Math.floor(bri / 255 * (chars.length - 1))
+          let ch = chars.charAt(idx)
+          if (usecolour) {
+            row.push({ c: ch, color: 'rgb(' + r + ',' + g + ',' + b + ')' })
+            out += '<span style="color:rgb(' + r + ',' + g + ',' + b + ')">' + ch + '</span>'
+          } else {
+            row.push({ c: ch, color: '#e0e0e0' })
+            out += ch
+          }
+        }
+        ascii.push(row)
+        out += '<br>'
+      }
+      document.getElementById('display').innerHTML = out
+    } catch (e) {
+      window.onerror(e.message, e.filename, e.lineno)
     }
+    window.requestAnimationFrame(asciiheartbeat)
+  }
 
-    function asciiheartbeat(time){
-      try{
-        let fps=parseInt(document.getElementById('renderfps').value)||30
-        if(mediatype==='video'&&media.duration){
-          let est=media.duration>0?Math.floor(media.getVideoPlaybackQuality().totalVideoFrames/media.duration):fps
-          fps=Math.min(fps,est)
-          document.getElementById('renderfps').max=est
-        }
-        if(time-lasttime<1000/fps)return window.requestAnimationFrame(asciiheartbeat)
-        lasttime=time
-        let detail=parseInt(document.getElementById('detailsize').value)||200
-        let aspect=1
-        if(media.videoWidth){
-          aspect=media.videoHeight/media.videoWidth
-        } else {
-          aspect=media.naturalHeight/media.naturalWidth
-        }
-        canv.width=detail
-        canv.height=Math.floor(detail*aspect)
-        ctx.drawImage(media,0,0,canv.width,canv.height)
-        let d=ctx.getImageData(0,0,canv.width,canv.height).data
-        ascii=[]
-        let out=''
-        let chars='.,-~:;=!*#$@'
-        for(let y=0;y<canv.height;y++){
-          let row=[]
-          for(let x=0;x<canv.width;x++){
-            let i=(y*canv.width+x)*4
-            let r=d[i],g=d[i+1],b=d[i+2]
-            let bri=0.299*r+0.587*g+0.114*b
-            let idx=Math.floor(bri/255*(chars.length-1))
-            let ch=chars.charAt(idx)
-            if(usecolour){
-              row.push({c:ch,color:'rgb('+r+','+g+','+b+')'})
-              out+='<span style="color:rgb('+r+','+g+','+b+')">'+ch+'</span>'
-            } else {
-              row.push({c:ch,color:'#e0e0e0'})
-              out+=ch
-            }
-          }
-          ascii.push(row)
-          out+='<br>'
-        }
-        document.getElementById('display').innerHTML=out
-      }catch(e){
-        window.onerror(e.message,e.filename,e.lineno)
+  let recordingCanvas = document.createElement('canvas')
+  let recordingCtx = recordingCanvas.getContext('2d')
+  recordingCanvas.style.display = 'none'
+  document.body.appendChild(recordingCanvas)
+
+  function startrecord() {
+    try {
+      let opt = { mimeType: 'video/mp4;codecs=avc1.42E01E' }
+      if (!MediaRecorder.isTypeSupported(opt.mimeType)) opt = { mimeType: 'video/mp4' }
+      let rec = recordingCanvas.captureStream()
+      let m = new MediaRecorder(rec, opt)
+      let parts = []
+      m.ondataavailable = e => { if (e.data.size > 0) parts.push(e.data) }
+      m.onstop = () => {
+        let b = new Blob(parts, { type: opt.mimeType })
+        saveAs(b, 'ascii_art.mp4')
       }
-      window.requestAnimationFrame(asciiheartbeat)
+      let t = mediatype === 'video' && media.duration ? media.duration * 1000 : 5000
+      m.start()
+      document.getElementById('progresscontainer').style.display = 'block'
+      let st = Date.now()
+      let iv = setInterval(() => {
+        let el = Date.now() - st
+        let p = Math.min(Math.floor(el / t * 100), 100)
+        let rem = Math.max(t - el, 0)
+        document.getElementById('progressbar').style.width = p + '%'
+        document.getElementById('progressmessage').textContent = 'time ' + Math.floor(el / 1000) + ' sec done ' + Math.floor(rem / 1000) + ' sec left ' + p + ' percent'
+        if (el >= t) {
+          clearInterval(iv)
+          m.stop()
+          document.getElementById('progressmessage').textContent = 'encoding complete'
+          setTimeout(() => {
+            document.getElementById('progresscontainer').style.display = 'none'
+            document.getElementById('progressmessage').textContent = ''
+          }, 2000)
+        }
+      }, 200)
+    } catch (e) {
+      window.onerror(e.message, e.filename, e.lineno)
     }
+  }
 
-    function startrecord(){
-      try{
-        let opt={mimeType:'video/mp4;codecs=avc1.42E01E'}
-        if(!MediaRecorder.isTypeSupported(opt.mimeType))opt={mimeType:'video/mp4'}
-        let rec=recordingCanvas.captureStream()
-        let m=new MediaRecorder(rec,opt)
-        let parts=[]
-        m.ondataavailable=e=>{if(e.data.size>0)parts.push(e.data)}
-        m.onstop=()=>{
-          let b=new Blob(parts,{type:opt.mimeType})
-          saveAs(b,'ascii_art.mp4')
+  document.getElementById('startprocess').addEventListener('click', () => {
+    try {
+      let fi = document.getElementById('mediainput')
+      if (!fi.files.length) return
+      let f = fi.files[0]
+      let u = URL.createObjectURL(f)
+      if (f.type.startsWith('image')) {
+        mediatype = 'image'
+        document.getElementById('saveascii').textContent = 'save ascii'
+        media = new Image()
+        media.onload = () => {
+          canv = document.createElement('canvas')
+          ctx = canv.getContext('2d')
+          window.requestAnimationFrame(asciiheartbeat)
         }
-        let t=mediatype==='video'&&media.duration?media.duration*1000:5000
-        m.start()
-        document.getElementById('progresscontainer').style.display='block'
-        let st=Date.now()
-        let iv=setInterval(()=>{
-          let el=Date.now()-st
-          let p=Math.min(Math.floor(el/t*100),100)
-          let rem=Math.max(t-el,0)
-          document.getElementById('progressbar').style.width=p+'%'
-          document.getElementById('progressmessage').textContent='time '+Math.floor(el/1000)+' sec done '+Math.floor(rem/1000)+' sec left '+p+' percent'
-          if(el>=t){
-            clearInterval(iv)
-            m.stop()
-            document.getElementById('progressmessage').textContent='encoding complete'
-            setTimeout(()=>{
-              document.getElementById('progresscontainer').style.display='none'
-              document.getElementById('progressmessage').textContent=''
-            },2000)
-          }
-        },200)
-      }catch(e){
-        window.onerror(e.message,e.filename,e.lineno)
+        media.src = u
+      } else if (f.type.startsWith('video')) {
+        mediatype = 'video'
+        document.getElementById('saveascii').textContent = 'render'
+        media = document.createElement('video')
+        media.crossOrigin = 'anonymous'
+        media.autoplay = true
+        media.muted = true
+        media.onloadeddata = () => {
+          canv = document.createElement('canvas')
+          ctx = canv.getContext('2d')
+          window.requestAnimationFrame(asciiheartbeat)
+        }
+        media.src = u
+        media.play()
       }
+    } catch (e) {
+      window.onerror(e.message, e.filename, e.lineno)
     }
+  })
 
-    document.getElementById('startprocess').addEventListener('click',()=>{
-      try{
-        let fi=document.getElementById('mediainput')
-        if(!fi.files.length)return
-        let f=fi.files[0]
-        let u=URL.createObjectURL(f)
-        if(f.type.startsWith('image')){
-          mediatype='image'
-          document.getElementById('saveascii').textContent='save ascii'
-          media=new Image()
-          media.onload=()=>{
-            canv=document.createElement('canvas')
-            ctx=canv.getContext('2d')
-            window.requestAnimationFrame(asciiheartbeat)
+  document.getElementById('saveascii').addEventListener('click', () => {
+    try {
+      if (mediatype === 'video') {
+        startrecord()
+      } else {
+        let rows = ascii.length
+        let cols = ascii[0].length
+        let fs = 10
+        let lh = fs * 1.2
+        let w = cols * fs * 0.6
+        let h = rows * lh
+        let oc = document.createElement('canvas')
+        oc.width = w
+        oc.height = h
+        let octx = oc.getContext('2d')
+        octx.fillStyle = '#0a0a0a'
+        octx.fillRect(0, 0, w, h)
+        octx.font = fs + 'px monospace'
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            let o = ascii[y][x]
+            octx.fillStyle = o.color
+            octx.fillText(o.c, x * fs * 0.6, (y + 1) * lh)
           }
-          media.src=u
-        } else if(f.type.startsWith('video')){
-          mediatype='video'
-          document.getElementById('saveascii').textContent='render'
-          media=document.createElement('video')
-          media.crossOrigin='anonymous'
-          media.autoplay=true
-          media.muted=true
-          media.onloadeddata=()=>{
-            canv=document.createElement('canvas')
-            ctx=canv.getContext('2d')
-            window.requestAnimationFrame(asciiheartbeat)
-          }
-          media.src=u
-          media.play()
         }
-      }catch(e){
-        window.onerror(e.message,e.filename,e.lineno)
+        oc.toBlob(b => saveAs(b, 'ascii_art.png'))
       }
-    })
+    } catch (e) {
+      window.onerror(e.message, e.filename, e.lineno)
+    }
+  })
 
-    let recordingCanvas=document.createElement('canvas')
-    let recordingCtx=recordingCanvas.getContext('2d')
-    recordingCanvas.style.display='none'
-    document.body.appendChild(recordingCanvas)
+  document.getElementById('togglecolour').addEventListener('click', function() {
+    usecolour = !usecolour
+    this.textContent = usecolour ? 'colour mode on' : 'colour mode off'
+  })
 
-    document.getElementById('saveascii').addEventListener('click',()=>{
-      try{
-        if(mediatype==='video'){
-          startrecord()
-        } else {
-          let rows=ascii.length
-          let cols=ascii[0].length
-          let fs=10
-          let lh=fs*1.2
-          let w=cols*fs*0.6
-          let h=rows*lh
-          let oc=document.createElement('canvas')
-          oc.width=w
-          oc.height=h
-          let octx=oc.getContext('2d')
-          octx.fillStyle='#0a0a0a'
-          octx.fillRect(0,0,w,h)
-          octx.font=fs+'px monospace'
-          for(let y=0;y<rows;y++){
-            for(let x=0;x<cols;x++){
-              let o=ascii[y][x]
-              octx.fillStyle=o.color
-              octx.fillText(o.c,x*fs*0.6,(y+1)*lh)
-            }
-          }
-          oc.toBlob(b=>saveAs(b,'ascii_art.png'))
-        }
-      }catch(e){
-        window.onerror(e.message,e.filename,e.lineno)
-      }
-    })
+  let drag = false
+  let ox = 0
+  let oy = 0
+  let main = document.getElementById('mainui')
+  document.getElementById('closebtn').addEventListener('touchstart', () => main.style.display = 'none')
+  main.addEventListener('touchstart', e => {
+    drag = true
+    ox = e.touches[0].clientX - main.offsetLeft
+    oy = e.touches[0].clientY - main.offsetTop
+  })
+  main.addEventListener('touchmove', e => {
+    if (!drag) return
+    main.style.left = e.touches[0].clientX - ox + 'px'
+    main.style.top = e.touches[0].clientY - oy + 'px'
+  })
+  main.addEventListener('touchend', () => drag = false)
+</script>
 
-    document.getElementById('togglecolour').addEventListener('click',function(){
-      usecolour=!usecolour
-      this.textContent=usecolour?'colour mode on':'colour mode off'
-    })
-
-    let drag=false,ox=0,oy=0
-    let main=document.getElementById('mainui')
-    document.getElementById('closebtn').addEventListener('touchstart',()=>main.style.display='none')
-    main.addEventListener('touchstart',e=>{
-      drag=true
-      ox=e.touches[0].clientX-main.offsetLeft
-      oy=e.touches[0].clientY-main.offsetTop
-    })
-    main.addEventListener('touchmove',e=>{
-      if(!drag)return
-      main.style.left=e.touches[0].clientX-ox+'px'
-      main.style.top=e.touches[0].clientY-oy+'px'
-    })
-    main.addEventListener('touchend',()=>drag=false)
-  </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-</body>
+  </body>
 </html>
