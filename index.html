@@ -2,1053 +2,303 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>clientside ascii media converter</title>
-  <script>
-    if (/mobi|android/i.test(navigator.userAgent)) {
-      let meta = document.createElement("meta");
-      meta.name = "viewport";
-      meta.content = "width=device-width,initial-scale=1,minimum-scale=0.1,maximum-scale=5,user-scalable=yes";
-      document.getElementsByTagName("head")[0].appendChild(meta);
-    }
-  </script>
+  <title>custom ascii converter</title>
+  <meta name="viewport" content="width=device-width initial-scale=1 minimum-scale=0.1 maximum-scale=5 user-scalable=yes">
   <style>
     body {
-      margin: 0;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      font-family: 'courier new', courier, monospace;
-      line-height: 1;
-      overflow-y: scroll;
+      margin:0
+      background:#0a0a0a
+      color:#e0e0e0
+      font-family:monospace
     }
-
     .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1em;
-      max-width: 800px;
-      margin: 0 auto;
+      display:flex
+      flex-direction:column
+      align-items:center
+      padding:1em
     }
-
-    h3 {
-        color: #00ccff;
-        margin-bottom: 0.5em;
+    button,input {
+      background:#003366
+      border:none
+      color:#e0e0e0
+      padding:0.5em 1em
+      margin:0.5em
+      font-size:1em
+      border-radius:4px
+      transition:background 0.3s
     }
-
-    button,
-    .file-label {
-      background: #003366;
-      border: none;
-      color: #e0e0e0;
-      padding: 0.6em 1.2em;
-      margin: 0.5em;
-      font-size: 1em;
-      border-radius: 4px;
-      transition: background 0.3s ease;
-      cursor: pointer;
-      display: inline-block;
-      text-align: center;
-      text-decoration: none;
+    button:hover,input:hover {
+      background:#005599
     }
-
-    button:hover:not(:disabled),
-    .file-label:hover {
-      background: #005599;
+    #closebtn {
+      position:absolute
+      top:0.5em
+      right:0.5em
+      background:#cc0000
+      width:2em
+      height:2em
+      line-height:2em
+      text-align:center
+      border-radius:50%
+      cursor:pointer
+      user-select:none
     }
-
-     button:disabled {
-        background: #002244;
-        color: #888;
-        cursor: not-allowed;
-     }
-
-    #fileInput {
-      display: none;
+    .movable {
+      position:absolute
+      touch-action:none
     }
-
-    input[type="number"] {
-       background: #002244;
-       border: 1px solid #003366;
-       color: #e0e0e0;
-       padding: 0.5em 0.8em;
-       margin: 0.5em;
-       font-size: 1em;
-       border-radius: 4px;
-       transition: border-color 0.3s;
-       width: 80px;
+    pre {
+      white-space:pre
+      font-size:1em
+      line-height:1em
+      margin:0
+      padding:1em
+      width:90%
+      overflow-x:auto
     }
-     input[type="number"]:focus {
-        outline: none;
-        border-color: #00ccff;
-     }
-
-
-    #fileNameDisplay {
-        margin: 0.5em 0 1em 0;
-        font-size: 0.9em;
-        color: #aaaaaa;
-        min-height: 1.2em;
-        text-align: center;
-        word-break: break-all;
-        text-transform: lowercase; /* Ensure text is lowercase */
+    #progresscontainer {
+      width:80%
+      background:#333
+      border-radius:5px
+      margin:1em 0
+      display:none
     }
-
-    .controls {
-        margin-bottom: 1em;
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
+    #progressbar {
+      height:20px
+      width:0%
+      background:#005599
+      border-radius:5px
+      transition:width 0.2s
     }
-
-    #displayArea {
-      margin: 1em auto;
-      padding: 0;
-      width: 100%;
-      text-align: center;
+    #errormessages {
+      color:#ff6666
+      font-size:0.8em
+      max-height:100px
+      overflow:auto
+      width:90%
+      margin-top:1em
     }
-
-     #displayCanvas {
-        display: block;
-        margin: 0 auto;
-        max-width: 100%;
-        height: auto;
-     }
-
-    #progressBarContainer {
-      width: 90%;
-      background: #333;
-      border-radius: 5px;
-      margin: 1em auto;
-      overflow: hidden;
-      display: none;
-    }
-    #progressBar {
-      height: 20px;
-      width: 0%;
-      background: #0077cc;
-      transition: width 0.3s ease-out;
-    }
-
-    #messageDisplay,
-    #infoNote {
-      margin: 0.8em 0;
-      font-size: 0.9em;
-      text-align: center;
-      min-height: 1.1em;
-      text-transform: lowercase; /* Ensure text is lowercase */
-    }
-    #messageDisplay {
-        color: #e0e0e0;
-    }
-    #infoNote {
-      color: #aaaaaa;
-    }
-
-    #hiddenMedia {
-       position: absolute;
-       left: -9999px;
-       top: -9999px;
-       opacity: 0;
-       pointer-events: none;
-       z-index: -1;
-    }
-
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h3>clientside ascii media magic!</h3>
-
-    <label for="fileInput" class="file-label">choose your media file</label>
-    <input type="file" id="fileInput" accept="image/*,video/*">
-    <div id="fileNameDisplay"></div>
-
-    <label>
-      ascii detail (columns)
-      <input type="number" id="detailSizeInput" value="150" min="20" step="10">
+  <div class="container movable" id="mainui">
+    <div id="closebtn">x</div>
+    <h3>custom ascii converter</h3>
+    <label>select file
+      <input type="file" id="mediainput" accept="image/*,video/*">
     </label>
-     <label id="playbackFpsLabel" style="display: none;">
-      playback fps (display)
-      <input type="number" id="playbackFpsInput" value="20" min="1" max="60">
+    <label>detail size columns
+      <input type="number" id="detailsize" value="200" min="50" step="50">
     </label>
-     <label id="renderFpsLabel" style="display: none;">
-      render fps (output video)
-      <input type="number" id="renderFpsInput" value="30" min="1" max="60">
+    <label>render fps
+      <input type="number" id="renderfps" value="30" min="1">
     </label>
-
-    <div class="controls">
-      <button id="processButton">process image</button>
-      <button id="renderButton" style="display: none;">render ascii video</button>
-      <button id="saveImageButton" style="display: none;">save ascii image</button>
-      <button id="toggleColorButton">colour mode off</button>
+    <div>
+      <button id="startprocess">process</button>
+      <button id="saveascii">save ascii</button>
+      <button id="togglecolour">colour mode off</button>
     </div>
-
-    <div id="progressBarContainer">
-      <div id="progressBar"></div>
+    <div id="progresscontainer">
+      <div id="progressbar"></div>
     </div>
-    <div id="messageDisplay"></div>
-     <div id="infoNote"></div>
-
-    <div id="displayArea">
-        <canvas id="displayCanvas"></canvas>
-    </div>
-
-    <video id="hiddenMedia" muted playsinline preload="auto"></video>
-
+    <div id="progressmessage"></div>
+    <pre id="display"></pre>
+    <div id="errormessages"></div>
   </div>
-
   <script>
-    const fileInput = document.getElementById('fileInput');
-    const fileNameDisplay = document.getElementById('fileNameDisplay');
-    const detailSizeInput = document.getElementById('detailSizeInput');
-    const playbackFpsInput = document.getElementById('playbackFpsInput');
-    const playbackFpsLabel = document.getElementById('playbackFpsLabel');
-    const renderFpsInput = document.getElementById('renderFpsInput');
-    const renderFpsLabel = document.getElementById('renderFpsLabel');
-    const processButton = document.getElementById('processButton');
-    const renderButton = document.getElementById('renderButton');
-    const saveImageButton = document.getElementById('saveImageButton');
-    const toggleColorButton = document.getElementById('toggleColorButton');
-    const progressBarContainer = document.getElementById('progressBarContainer');
-    const progressBar = document.getElementById('progressBar');
-    const messageDisplay = document.getElementById('messageDisplay');
-    const infoNote = document.getElementById('infoNote');
-    const displayCanvas = document.getElementById('displayCanvas');
-    const hiddenMedia = document.getElementById('hiddenMedia');
-    const displayCtx = displayCanvas.getContext('2d');
+    let media=null
+    let ctx=null
+    let canv=document.createElement('canvas')
+    let mediatype=null
+    let usecolour=false
+    let ascii=[]
+    let lasttime=0
 
-    const ASCII_CHAR_SET = ".,-~:;=!*#$@";
-    const BASE_FONT_SIZE = 12;
-    const CHAR_WIDTH_RATIO = 0.6;
-    const LINE_HEIGHT_FACTOR = 1.2;
+    window.onerror=function(msg,url,line){
+      let e=document.getElementById('errormessages')
+      e.textContent+=msg+' at '+line+'\\n'
+    }
 
-    let currentMedia = null;
-    let currentMediaType = null;
-    let useColorMode = false;
-    let isProcessing = false;
-    let isPlayingVideo = false;
-    let videoFrameCallbackId = null;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let renderFrameCount = 0;
-    let totalRenderFrames = 0;
-    let renderSeekTimeout = null;
-    let renderStartTime = 0;
-
-    const processingCanvas = document.createElement('canvas');
-    const processingCtx = processingCanvas.getContext('2d');
-
-    const recordingCanvas = document.createElement('canvas');
-    const recordingCtx = recordingCanvas.getContext('2d');
-
-
-    function drawFrameToProcessingCanvas() {
-        if (!currentMedia || !processingCtx) return false;
-
-        const detail = parseInt(detailSizeInput.value) || 150;
-        let mediaWidth, mediaHeight;
-
-        if (currentMediaType === 'image') {
-            mediaWidth = currentMedia.naturalWidth;
-            mediaHeight = currentMedia.naturalHeight;
-        } else if (currentMediaType === 'video') {
-            mediaWidth = currentMedia.videoWidth;
-            mediaHeight = currentMedia.videoHeight;
+    function asciiheartbeat(time){
+      try{
+        let fps=parseInt(document.getElementById('renderfps').value)||30
+        if(mediatype==='video'&&media.duration){
+          let est=media.duration>0?Math.floor(media.getVideoPlaybackQuality().totalVideoFrames/media.duration):fps
+          fps=Math.min(fps,est)
+          document.getElementById('renderfps').max=est
+        }
+        if(time-lasttime<1000/fps)return window.requestAnimationFrame(asciiheartbeat)
+        lasttime=time
+        let detail=parseInt(document.getElementById('detailsize').value)||200
+        let aspect=1
+        if(media.videoWidth){
+          aspect=media.videoHeight/media.videoWidth
         } else {
-            return false;
+          aspect=media.naturalHeight/media.naturalWidth
         }
-
-         if (mediaWidth <= 0 || mediaHeight <= 0) {
-             console.warn("media dimensions not ready for processing.");
-             return false;
-         }
-
-
-        const aspect = mediaHeight / mediaWidth;
-        processingCanvas.width = detail;
-        processingCanvas.height = Math.floor(detail * aspect);
-
-        try {
-            processingCtx.drawImage(currentMedia, 0, 0, processingCanvas.width, processingCanvas.height);
-            return true;
-        } catch (e) {
-             console.error("error drawing media to processing canvas:", e);
-             showMessage("error processing image/frame. check console.", 5000);
-             if (isProcessing) {
-                 resetAppState();
-             }
-             return false;
-        }
-    }
-
-    function getAsciiCharacters() {
-        if (!processingCtx || processingCanvas.width === 0 || processingCanvas.height === 0) return null;
-
-        let imgData;
-        try {
-             imgData = processingCtx.getImageData(0, 0, processingCanvas.width, processingCanvas.height).data;
-        } catch (e) {
-            console.error("error getting image data from processing canvas:", e);
-            showMessage("error accessing pixel data (cors issue?). cannot process.", 5000);
-            if (isProcessing) {
-                resetAppState();
-            }
-            return null;
-        }
-
-
-        const asciiCharacters = [];
-        const numChars = ASCII_CHAR_SET.length;
-        const asciiWidth = processingCanvas.width;
-        const asciiHeight = processingCanvas.height;
-
-        for (let y = 0; y < asciiHeight; y++) {
-            for (let x = 0; x < asciiWidth; x++) {
-                const i = (y * asciiWidth + x) * 4;
-                const r = imgData[i];
-                const g = imgData[i + 1];
-                const b = imgData[i + 2];
-
-                const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-
-                const charIndex = Math.floor((brightness / 255) * (numChars - 1));
-                const char = ASCII_CHAR_SET.charAt(charIndex);
-
-                const color = `rgb(${r},${g},${b})`;
-
-                asciiCharacters.push({ char: char, color: color });
-            }
-        }
-        return asciiCharacters;
-    }
-
-    function drawAsciiOnCanvas(asciiChars, targetCtx, targetCanvas, useColor, fontSize, charRatio, lineHeightFactor) {
-        if (!asciiChars || !targetCtx || !targetCanvas) return;
-
-        const asciiWidth = processingCanvas.width;
-        const asciiHeight = processingCanvas.height;
-
-        targetCanvas.width = asciiWidth * fontSize * charRatio;
-        targetCanvas.height = asciiHeight * fontSize * lineHeightFactor;
-
-        targetCtx.fillStyle = "#0a0a0a";
-        targetCtx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
-        targetCtx.font = `${fontSize}px monospace`;
-        targetCtx.textBaseline = "top";
-
-        for (let y = 0; y < asciiHeight; y++) {
-            for (let x = 0; x < asciiWidth; x++) {
-                const index = y * asciiWidth + x;
-                const charObj = asciiChars[index];
-
-                targetCtx.fillStyle = useColor ? charObj.color : "#e0e0e0";
-                targetCtx.fillText(charObj.char, x * fontSize * charRatio, y * fontSize * lineHeightFactor);
-            }
-        }
-    }
-
-
-    async function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (!file) {
-            resetAppState();
-            return;
-        }
-
-        resetAppState();
-        isProcessing = true;
-
-        fileNameDisplay.textContent = `selected: ${file.name.toLowerCase()}`;
-        showMessage(`loading "${file.name.toLowerCase()}"...`);
-
-        const fileUrl = URL.createObjectURL(file);
-
-        if (currentMedia && currentMedia.src) {
-             URL.revokeObjectURL(currentMedia.src);
-        }
-
-
-        if (file.type.startsWith('image/')) {
-            currentMediaType = 'image';
-            currentMedia = new Image();
-            currentMedia.onload = handleImageLoaded;
-            currentMedia.onerror = handleMediaError;
-
-            processButton.textContent = 'process image';
-            processButton.style.display = 'inline-block';
-            renderButton.style.display = 'none';
-            saveImageButton.style.display = 'none';
-            playbackFpsLabel.style.display = 'none';
-            renderFpsLabel.style.display = 'none';
-            infoNote.style.display = 'none';
-
-            disableUI(false);
-
-            currentMedia.src = fileUrl;
-
-        } else if (file.type.startsWith('video/')) {
-            currentMediaType = 'video';
-            currentMedia = hiddenMedia;
-            currentMedia.removeAttribute('src');
-            currentMedia.load();
-
-            currentMedia.onloadedmetadata = handleVideoLoadedMetadata;
-            currentMedia.onerror = handleMediaError;
-            currentMedia.onseeked = handleVideoSeeked;
-            currentMedia.onplay = handleVideoPlay;
-            currentMedia.onpause = handleVideoPause;
-            currentMedia.onended = handleVideoEnded;
-
-
-            processButton.textContent = 'start playback';
-            processButton.style.display = 'inline-block';
-            renderButton.style.display = 'inline-block';
-            saveImageButton.style.display = 'none';
-            playbackFpsLabel.style.display = 'inline-block';
-            renderFpsLabel.style.display = 'inline-block';
-            infoNote.style.display = 'block';
-            infoNote.textContent = 'click "start playback" for ascii video display or "render ascii video" to create a file.';
-
-
-            disableUI(false);
-            renderButton.disabled = true;
-
-            currentMedia.src = fileUrl;
-            currentMedia.load();
-
-        } else {
-            showMessage("unsupported file type. please choose an image or video.", 4000);
-            resetAppState();
-        }
-    }
-
-    function handleMediaError(event) {
-        console.error('media load error:', event);
-        let errorMessage = 'failed to load media.';
-        if (event.target && event.target.error) {
-            const err = event.target.error;
-            errorMessage += ` code ${err.code}: ${err.message ? err.message.toLowerCase() : 'unknown error'}`;
-        }
-        showMessage(errorMessage, 5000);
-        resetAppState();
-    }
-
-    function handleImageLoaded() {
-        console.log('image loaded successfully.');
-        isProcessing = false;
-        showMessage("image loaded. click 'process image'.");
-    }
-
-    function processImage() {
-         if (!currentMedia || currentMediaType !== 'image') {
-             showMessage("no image loaded or ready.", 2000);
-             return;
-         }
-
-         isProcessing = true;
-         disableUI(true);
-
-         showMessage("processing image...");
-
-         setTimeout(() => {
-            const success = drawFrameToProcessingCanvas();
-            if (!success) {
-                isProcessing = false;
-                disableUI(false);
-                return;
-            }
-            const asciiChars = getAsciiCharacters();
-
-            if (asciiChars) {
-                const displayFontSize = calculateDisplayFontSize();
-                 drawAsciiOnCanvas(
-                     asciiChars,
-                     displayCtx,
-                     displayCanvas,
-                     useColorMode,
-                     displayFontSize,
-                     CHAR_WIDTH_RATIO,
-                     LINE_HEIGHT_FACTOR
-                 );
-                 saveImageButton.style.display = 'inline-block';
-
-                showMessage("image processed and displayed!", 3000);
+        canv.width=detail
+        canv.height=Math.floor(detail*aspect)
+        ctx.drawImage(media,0,0,canv.width,canv.height)
+        let d=ctx.getImageData(0,0,canv.width,canv.height).data
+        ascii=[]
+        let out=''
+        let chars='.,-~:;=!*#$@'
+        for(let y=0;y<canv.height;y++){
+          let row=[]
+          for(let x=0;x<canv.width;x++){
+            let i=(y*canv.width+x)*4
+            let r=d[i],g=d[i+1],b=d[i+2]
+            let bri=0.299*r+0.587*g+0.114*b
+            let idx=Math.floor(bri/255*(chars.length-1))
+            let ch=chars.charAt(idx)
+            if(usecolour){
+              row.push({c:ch,color:'rgb('+r+','+g+','+b+')'})
+              out+='<span style="color:rgb('+r+','+g+','+b+')">'+ch+'</span>'
             } else {
-                // error message already shown
+              row.push({c:ch,color:'#e0e0e0'})
+              out+=ch
             }
-
-            isProcessing = false;
-            disableUI(false);
-         }, 10);
-    }
-
-    function calculateDisplayFontSize() {
-        const detail = parseInt(detailSizeInput.value) || 150;
-        const displayAreaWidth = displayCanvas.parentElement.clientWidth;
-        const asciiGridWidth = detail;
-        return Math.max(1, displayAreaWidth / (asciiGridWidth * CHAR_WIDTH_RATIO));
-    }
-
-
-    function handleVideoLoadedMetadata() {
-        console.log('video metadata loaded.', { duration: currentMedia.duration, width: currentMedia.videoWidth, height: currentMedia.videoHeight });
-        isProcessing = false;
-        renderButton.disabled = false;
-
-        currentMedia.currentTime = 0;
-    }
-
-    function handleVideoSeeked() {
-        if (renderSeekTimeout) {
-            clearTimeout(renderSeekTimeout);
-            renderSeekTimeout = null;
+          }
+          ascii.push(row)
+          out+='<br>'
         }
-
-        if (currentMedia.readyState < 2) {
-            console.warn("seeked fired but video state not ready for frame. state:", currentMedia.readyState);
-            if (isProcessing && currentMediaType === 'video') {
-                 setTimeout(() => {
-                    renderFrameCount++;
-                    updateProgressDisplay();
-                    renderNextFrame();
-                 }, 10);
-            }
-            return;
-        }
-
-        const success = drawFrameToProcessingCanvas();
-         if (!success) return;
-
-        const asciiChars = getAsciiCharacters();
-         if (!asciiChars) return;
-
-        if (isProcessing && currentMediaType === 'video') {
-             const recordingFontSize = BASE_FONT_SIZE;
-             drawAsciiOnCanvas(
-                 asciiChars,
-                 recordingCtx,
-                 recordingCanvas,
-                 useColorMode,
-                 recordingFontSize,
-                 CHAR_WIDTH_RATIO,
-                 LINE_HEIGHT_FACTOR
-             );
-
-            renderFrameCount++;
-            updateProgressDisplay();
-
-            if (isProcessing && currentMediaType === 'video') {
-                renderNextFrame();
-            }
-
-        } else {
-             const displayFontSize = calculateDisplayFontSize();
-             drawAsciiOnCanvas(
-                 asciiChars,
-                 displayCtx,
-                 displayCanvas,
-                 useColorMode,
-                 displayFontSize,
-                 CHAR_WIDTH_RATIO,
-                 LINE_HEIGHT_FACTOR
-             );
-        }
-    }
-
-
-    function startAsciiPlayback() {
-        if (!currentMedia || currentMediaType !== 'video' || isProcessing || isPlayingVideo) return;
-
-        isPlayingVideo = true;
-        const playbackFps = parseInt(playbackFpsInput.value) || 20;
-
-        currentMedia.loop = true;
-        currentMedia.muted = true;
-        currentMedia.volume = 0;
-
-         currentMedia.play().then(() => {
-             console.log("video playback started for ascii display.");
-             showMessage("playing ascii video...", 0);
-             processButton.textContent = 'pause playback';
-
-             if ('requestVideoFrameCallback' in currentMedia) {
-                 console.log("using requestvideoframecallback for display sync.");
-                 videoFrameCallbackId = currentMedia.requestVideoFrameCallback(handleVideoFrameCallback);
-             } else {
-                 console.warn("requestvideoframecallback not supported. falling back to timeupdate.");
-                 currentMedia.ontimeupdate = handleVideoTimeUpdate;
-                 currentMedia._lastFrameTime = 0;
-             }
-
-
-         }).catch(error => {
-             console.error("error starting video playback:", error);
-             showMessage("error starting playback. user gesture might be required.".toLowerCase(), 5000);
-             isPlayingVideo = false;
-             processButton.textContent = 'start playback';
-         });
-    }
-
-    function stopAsciiPlayback() {
-        if (!currentMedia || currentMediaType !== 'video' || !isPlayingVideo) return;
-
-        isPlayingVideo = false;
-        currentMedia.pause();
-
-         if (videoFrameCallbackId !== null) {
-              videoFrameCallbackId = null;
-         }
-         currentMedia.ontimeupdate = null;
-         currentMedia._lastFrameTime = 0;
-
-        showMessage("playback paused.".toLowerCase(), 3000);
-        processButton.textContent = 'start playback';
-        infoNote.style.display = 'block';
-    }
-
-    function handleVideoFrameCallback(now, metadata) {
-        if (!isPlayingVideo || currentMediaType !== 'video' || isProcessing) {
-             videoFrameCallbackId = null;
-             return;
-        }
-
-        processVideoFrameForDisplay();
-
-        videoFrameCallbackId = currentMedia.requestVideoFrameCallback(handleVideoFrameCallback);
-    }
-
-     function handleVideoTimeUpdate() {
-         if (!isPlayingVideo || currentMediaType !== 'video' || isProcessing) {
-             currentMedia.ontimeupdate = null;
-             currentMedia._lastFrameTime = 0;
-             return;
-         }
-
-         const now = performance.now();
-         const frameInterval = 1000 / (parseInt(playbackFpsInput.value) || 20);
-         const currentTime = currentMedia.currentTime * 1000;
-
-         if (!currentMedia._lastFrameTime || (currentTime - currentMedia._lastFrameTime) > frameInterval - 5) {
-             currentMedia._lastFrameTime = currentTime;
-             processVideoFrameForDisplay();
-         }
-     }
-
-
-    function processVideoFrameForDisplay() {
-        if (!currentMedia || currentMediaType !== 'video' || isProcessing) return;
-
-        const success = drawFrameToProcessingCanvas();
-        if (!success) return;
-
-        const asciiChars = getAsciiCharacters();
-        if (!asciiChars) return;
-
-        const displayFontSize = calculateDisplayFontSize();
-         drawAsciiOnCanvas(
-             asciiChars,
-             displayCtx,
-             displayCanvas,
-             useColorMode,
-             displayFontSize,
-             CHAR_WIDTH_RATIO,
-             LINE_HEIGHT_FACTOR
-         );
-    }
-
-
-    async function startVideoRendering() {
-         if (!currentMedia || currentMediaType !== 'video' || isProcessing) {
-             showMessage("please select a video file first or wait for current process.".toLowerCase(), 3000);
-             return;
-         }
-
-         stopAsciiPlayback();
-
-         isProcessing = true;
-         disableUI(true);
-         progressBarContainer.style.display = 'block';
-         showMessage("preparing to render ascii video...");
-         infoNote.style.display = 'block';
-         infoNote.textContent = 'rendering video... please wait. original audio will play during this process but is not saved in the output video.'.toLowerCase();
-
-
-         const renderFps = parseInt(renderFpsInput.value) || 30;
-         const videoDuration = currentMedia.duration;
-         totalRenderFrames = Math.floor(videoDuration * renderFps);
-         renderFrameCount = 0;
-         renderStartTime = performance.now();
-
-
-         let options = { mimeType: 'video/mp4;codecs=avc1.42E01E' };
-         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-              options = { mimeType: 'video/webm;codecs=vp9' };
-              if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                  options = { mimeType: 'video/webm' };
-                  if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                      showMessage("error: no supported video recording format found (mp4, webm/vp9, webm). cannot render.".toLowerCase(), 8000);
-                      console.error("mediarecorder: no supported format found.");
-                      resetAppState();
-                      return;
-                  }
-              }
-              infoNote.textContent += "\n(using webm format)";
-         }
-
-         recordedChunks = [];
-         const canvasStream = recordingCanvas.captureStream(renderFps);
-         mediaRecorder = new MediaRecorder(canvasStream, options);
-
-         mediaRecorder.ondataavailable = (event) => {
-             if (event.data.size > 0) {
-                 recordedChunks.push(event.data);
-             }
-         };
-
-         mediaRecorder.onstop = handleMediaRecorderStop;
-         mediaRecorder.onerror = handleMediaRecorderError;
-
-
-         if (currentMedia.readyState < 2) {
-              console.log("waiting for video metadata before starting render seeks...");
-              await new Promise(resolve => currentMedia.addEventListener('loadedmetadata', resolve, {once: true}));
-              console.log("metadata loaded, proceeding with render.");
-         }
-
-
-         currentMedia.muted = false;
-         currentMedia.volume = 1;
-         currentMedia.currentTime = 0;
-         currentMedia.play().catch(e => console.warn("playback for audio preview failed:", e));
-
-
-         mediaRecorder.start();
-         console.log("mediarecorder started capturing from canvas.");
-         renderNextFrame();
-    }
-
-    function renderNextFrame() {
-        if (!isProcessing || currentMediaType !== 'video') return;
-
-        const targetTime = renderFrameCount / (parseInt(renderFpsInput.value) || 30);
-        const duration = currentMedia.duration;
-        const epsilon = 0.001;
-
-        if (targetTime >= duration - epsilon || renderFrameCount >= totalRenderFrames) {
-             console.log("finished queuing frames for rendering.");
-             return;
-        }
-
-        currentMedia.currentTime = targetTime;
-
-        renderSeekTimeout = setTimeout(() => {
-            console.warn(`timeout waiting for seeked at ${targetTime.toFixed(3)}s. manually proceeding.`);
-             renderSeekTimeout = null;
-             if (currentMedia.readyState >= 2) {
-                renderFrameCount++;
-                updateProgressDisplay();
-                renderNextFrame();
-             } else {
-                 console.error("video not ready for manual frame processing after seek timeout.");
-                 resetAppState();
-             }
-
-        }, 1000);
-    }
-
-    function updateProgressDisplay() {
-        if (!isProcessing || totalRenderFrames === 0) return;
-
-        const percent = Math.min(Math.floor((renderFrameCount / totalRenderFrames) * 100), 100);
-        progressBar.style.width = percent + "%";
-        messageDisplay.textContent = `rendering: ${percent}% (${renderFrameCount}/${totalRenderFrames} frames)`;
-
-        if (renderFrameCount > 0 && renderStartTime > 0) {
-            const elapsedMs = performance.now() - renderStartTime;
-            const estimatedTimePerFrameMs = elapsedMs / renderFrameCount;
-            const remainingFrames = totalRenderFrames - renderFrameCount;
-            const estimatedRemainingTimeMs = remainingFrames * estimatedTimePerFrameMs;
-            const estimatedRemainingSeconds = Math.floor(estimatedRemainingTimeMs / 1000);
-            if (!isNaN(estimatedRemainingSeconds) && estimatedRemainingSeconds >= 0) {
-                 messageDisplay.textContent += ` - est. time left: ${estimatedRemainingSeconds}s`;
-            }
-        }
-    }
-
-    function handleMediaRecorderStop() {
-        console.log("mediarecorder stopped. creating blob.");
-         if (renderSeekTimeout) {
-            clearTimeout(renderSeekTimeout);
-            renderSeekTimeout = null;
-        }
-
-         if (currentMedia && currentMediaType === 'video') {
-             currentMedia.pause();
-             currentMedia.muted = true;
-             currentMedia.volume = 0;
-         }
-
-        const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
-
-        const fileExtension = mediaRecorder.mimeType.split('/')[1].split(';')[0];
-        const outputFileName = `ascii_video.${fileExtension}`;
-
-        saveAs(blob, outputFileName);
-
-        showMessage("ascii video rendered successfully!", 5000);
-        console.log("blob created and save initiated.");
-
-        resetAppState();
-    }
-
-    function handleMediaRecorderError(event) {
-        console.error("mediarecorder error:", event);
-        showMessage(`recording error: ${event.error.name.toLowerCase()}. try a different browser or lower fps.`, 8000);
-
-         if (currentMedia && currentMediaType === 'video') {
-             currentMedia.pause();
-             currentMedia.muted = true;
-             currentMedia.volume = 0;
-         }
-
-         if (renderSeekTimeout) {
-            clearTimeout(renderSeekTimeout);
-            renderSeekTimeout = null;
-        }
-
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-             try { mediaRecorder.stop(); } catch(e) { console.warn("error during error stop:", e); }
-        }
-        mediaRecorder = null;
-        recordedChunks = [];
-        resetAppState();
-    }
-
-
-     function handleVideoPlay() {
-         console.log("hidden video playing.");
-     }
-
-     function handleVideoPause() {
-         console.log("hidden video paused.");
-     }
-
-     function handleVideoEnded() {
-         console.log("hidden video ended.");
-     }
-
-
-    function disableUI(disabled) {
-        fileInput.disabled = disabled;
-        document.querySelector('.file-label').style.pointerEvents = disabled ? 'none' : 'auto';
-        detailSizeInput.disabled = disabled;
-        playbackFpsInput.disabled = disabled;
-        renderFpsInput.disabled = disabled;
-        processButton.disabled = disabled;
-        renderButton.disabled = disabled;
-        saveImageButton.disabled = disabled;
-        toggleColorButton.disabled = disabled;
-    }
-
-    function showMessage(text, duration = 3000) {
-        messageDisplay.textContent = text.toLowerCase();
-        if (duration > 0) {
-            setTimeout(() => {
-                if (messageDisplay.textContent === text.toLowerCase()) {
-                    messageDisplay.textContent = '';
-                }
-            }, duration);
-        }
-    }
-
-
-    function resetAppState() {
-        console.log("resetting application state...");
-
-        if (isPlayingVideo) {
-            stopAsciiPlayback();
-        }
-        if (isProcessing && mediaRecorder && mediaRecorder.state !== 'inactive') {
-            console.log("attempting to stop mediarecorder during reset...");
-             try { mediaRecorder.stop(); } catch(e) { console.warn("error stopping mediarecorder on reset:", e); }
-        }
-
-        isProcessing = false;
-        isPlayingVideo = false;
-        videoFrameCallbackId = null;
-        mediaRecorder = null;
-        recordedChunks = [];
-        renderFrameCount = 0;
-        totalRenderFrames = 0;
-        if(renderSeekTimeout) clearTimeout(renderSeekTimeout);
-        renderSeekTimeout = null;
-        renderStartTime = 0;
-
-        if (currentMedia && currentMedia.src) {
-             console.log("revoking object url:", currentMedia.src);
-             URL.revokeObjectURL(currentMedia.src);
-        }
-        if (hiddenMedia) {
-             hiddenMedia.onloadedmetadata = null;
-             hiddenMedia.onerror = null;
-             hiddenMedia.onseeked = null;
-             hiddenMedia.onplay = null;
-             hiddenMedia.onpause = null;
-             hiddenMedia.onended = null;
-             hiddenMedia.ontimeupdate = null;
-             hiddenMedia._lastFrameTime = 0;
-             hiddenMedia.removeAttribute('src');
-             hiddenMedia.load();
-        }
-        currentMedia = null;
-        currentMediaType = null;
-
-
-        fileNameDisplay.textContent = '';
-        progressBar.style.width = "0%";
-        progressBarContainer.style.display = 'none';
-        messageDisplay.textContent = '';
-        infoNote.style.display = 'none';
-        infoNote.textContent = '';
-
-
-        displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
-        recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
-        displayCanvas.width = 0; displayCanvas.height = 0;
-        recordingCanvas.width = 0; recordingCanvas.height = 0;
-
-
-        processButton.textContent = 'process image';
-        saveButton.textContent = 'save ascii image';
-        saveImageButton.style.display = 'none';
-        processButton.style.display = 'inline-block';
-        renderButton.style.display = 'none';
-        playbackFpsLabel.style.display = 'none';
-        renderFpsLabel.style.display = 'none';
-
-
-        disableUI(false);
-        console.log("application state reset complete.");
-    }
-
-
-    function initializeApp() {
-        console.log("hello there! initializing ascii media converter...");
-
-        resetAppState();
-
-        fileInput.addEventListener('change', handleFileSelect);
-        processButton.addEventListener('click', handleProcessButtonClick);
-        renderButton.addEventListener('click', startVideoRendering);
-        saveImageButton.addEventListener('click', handleSaveImageButtonClick);
-        toggleColorButton.addEventListener('click', handleToggleColorClick);
-        detailSizeInput.addEventListener('change', handleSettingChange);
-        playbackFpsInput.addEventListener('change', handleSettingChange);
-        renderFpsInput.addEventListener('change', handleSettingChange);
-
-        console.log("app initialized. ready for file selection.");
-    }
-
-     function handleProcessButtonClick() {
-         if (!currentMedia) {
-              showMessage("please choose a file first!", 2000);
-              return;
-         }
-         if (currentMediaType === 'image') {
-             processImage();
-         } else if (currentMediaType === 'video') {
-             if (isPlayingVideo) {
-                 stopAsciiPlayback();
-             } else {
-                 startAsciiPlayback();
-             }
-         }
-     }
-
-     function handleSettingChange() {
-         if (currentMedia && currentMedia.readyState >= 2 && !isProcessing) {
-             console.log("setting changed. redrawing current frame.");
-             if (currentMediaType === 'image') {
-                 processImage();
-             } else if (currentMediaType === 'video') {
-                 currentMedia.currentTime = currentMedia.currentTime;
-             }
-         } else if (currentMedia && currentMediaType === 'video' && isProcessing) {
-             console.warn("setting changed during active rendering. change will apply to next render.");
-             showMessage("setting change will apply to the next video render.".toLowerCase(), 3000);
-         }
-     }
-
-     function handleSaveImageButtonClick() {
-         if (!currentMedia || currentMediaType !== "image" || !displayCanvas || displayCanvas.width === 0) {
-              showMessage("nothing to save (process an image first).".toLowerCase(), 3000);
-              return;
-         }
-
-          showMessage("preparing image for save...");
-
-         const asciiWidth = processingCanvas.width;
-         const asciiHeight = processingCanvas.height;
-         const saveFontSize = BASE_FONT_SIZE;
-         const saveCanvasWidth = asciiWidth * saveFontSize * CHAR_WIDTH_RATIO;
-         const saveCanvasHeight = asciiHeight * saveFontSize * LINE_HEIGHT_FACTOR;
-
-         const saveCanvas = document.createElement("canvas");
-         saveCanvas.width = saveCanvasWidth;
-         saveCanvas.height = saveCanvasHeight;
-         const saveCtx = saveCanvas.getContext("2d");
-
-         saveCtx.fillStyle = "#0a0a0a";
-         saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
-         saveCtx.font = `${saveFontSize}px monospace`;
-         saveCtx.textBaseline = "top";
-
-          if (!drawFrameToProcessingCanvas()) return;
-          const asciiChars = getAsciiCharacters();
-          if (!asciiChars) return;
-
-          drawAsciiOnCanvas(
-              asciiChars,
-              saveCtx,
-              saveCanvas,
-              useColorMode,
-              saveFontSize,
-              CHAR_WIDTH_RATIO,
-              LINE_HEIGHT_FACTOR
-          );
-
-
-         saveCanvas.toBlob(blob => {
-           if (blob) {
-             saveAs(blob, "ascii_art.png");
-             showMessage("ascii image saved!", 3000);
-           } else {
-              showMessage("error saving image.", 3000);
-           }
-         }, 'image/png');
-     }
-
-      function handleToggleColorClick() {
-          useColorMode = !useColorMode;
-          toggleColorButton.textContent = useColorMode ? "colour mode on" : "colour mode off";
-
-          if (currentMedia && currentMedia.readyState >= 2 && !isProcessing) {
-              console.log("color mode toggled. redrawing current frame.");
-               if (currentMediaType === 'image') {
-                  processImage();
-               } else if (currentMediaType === 'video') {
-                   currentMedia.currentTime = currentMedia.currentTime;
-               }
-           } else if (isProcessing) {
-               console.warn("color mode toggled during active process. change will apply to next process.");
-               showMessage("colour change will apply to the next process.".toLowerCase(), 3000);
-           }
+        document.getElementById('display').innerHTML=out
+      }catch(e){
+        window.onerror(e.message,e.filename,e.lineno)
       }
+      window.requestAnimationFrame(asciiheartbeat)
+    }
 
+    function startrecord(){
+      try{
+        let opt={mimeType:'video/mp4;codecs=avc1.42E01E'}
+        if(!MediaRecorder.isTypeSupported(opt.mimeType))opt={mimeType:'video/mp4'}
+        let rec=recordingCanvas.captureStream()
+        let m=new MediaRecorder(rec,opt)
+        let parts=[]
+        m.ondataavailable=e=>{if(e.data.size>0)parts.push(e.data)}
+        m.onstop=()=>{
+          let b=new Blob(parts,{type:opt.mimeType})
+          saveAs(b,'ascii_art.mp4')
+        }
+        let t=mediatype==='video'&&media.duration?media.duration*1000:5000
+        m.start()
+        document.getElementById('progresscontainer').style.display='block'
+        let st=Date.now()
+        let iv=setInterval(()=>{
+          let el=Date.now()-st
+          let p=Math.min(Math.floor(el/t*100),100)
+          let rem=Math.max(t-el,0)
+          document.getElementById('progressbar').style.width=p+'%'
+          document.getElementById('progressmessage').textContent='time '+Math.floor(el/1000)+' sec done '+Math.floor(rem/1000)+' sec left '+p+' percent'
+          if(el>=t){
+            clearInterval(iv)
+            m.stop()
+            document.getElementById('progressmessage').textContent='encoding complete'
+            setTimeout(()=>{
+              document.getElementById('progresscontainer').style.display='none'
+              document.getElementById('progressmessage').textContent=''
+            },2000)
+          }
+        },200)
+      }catch(e){
+        window.onerror(e.message,e.filename,e.lineno)
+      }
+    }
 
-    initializeApp();
+    document.getElementById('startprocess').addEventListener('click',()=>{
+      try{
+        let fi=document.getElementById('mediainput')
+        if(!fi.files.length)return
+        let f=fi.files[0]
+        let u=URL.createObjectURL(f)
+        if(f.type.startsWith('image')){
+          mediatype='image'
+          document.getElementById('saveascii').textContent='save ascii'
+          media=new Image()
+          media.onload=()=>{
+            canv=document.createElement('canvas')
+            ctx=canv.getContext('2d')
+            window.requestAnimationFrame(asciiheartbeat)
+          }
+          media.src=u
+        } else if(f.type.startsWith('video')){
+          mediatype='video'
+          document.getElementById('saveascii').textContent='render'
+          media=document.createElement('video')
+          media.crossOrigin='anonymous'
+          media.autoplay=true
+          media.muted=true
+          media.onloadeddata=()=>{
+            canv=document.createElement('canvas')
+            ctx=canv.getContext('2d')
+            window.requestAnimationFrame(asciiheartbeat)
+          }
+          media.src=u
+          media.play()
+        }
+      }catch(e){
+        window.onerror(e.message,e.filename,e.lineno)
+      }
+    })
 
+    let recordingCanvas=document.createElement('canvas')
+    let recordingCtx=recordingCanvas.getContext('2d')
+    recordingCanvas.style.display='none'
+    document.body.appendChild(recordingCanvas)
+
+    document.getElementById('saveascii').addEventListener('click',()=>{
+      try{
+        if(mediatype==='video'){
+          startrecord()
+        } else {
+          let rows=ascii.length
+          let cols=ascii[0].length
+          let fs=10
+          let lh=fs*1.2
+          let w=cols*fs*0.6
+          let h=rows*lh
+          let oc=document.createElement('canvas')
+          oc.width=w
+          oc.height=h
+          let octx=oc.getContext('2d')
+          octx.fillStyle='#0a0a0a'
+          octx.fillRect(0,0,w,h)
+          octx.font=fs+'px monospace'
+          for(let y=0;y<rows;y++){
+            for(let x=0;x<cols;x++){
+              let o=ascii[y][x]
+              octx.fillStyle=o.color
+              octx.fillText(o.c,x*fs*0.6,(y+1)*lh)
+            }
+          }
+          oc.toBlob(b=>saveAs(b,'ascii_art.png'))
+        }
+      }catch(e){
+        window.onerror(e.message,e.filename,e.lineno)
+      }
+    })
+
+    document.getElementById('togglecolour').addEventListener('click',function(){
+      usecolour=!usecolour
+      this.textContent=usecolour?'colour mode on':'colour mode off'
+    })
+
+    let drag=false,ox=0,oy=0
+    let main=document.getElementById('mainui')
+    document.getElementById('closebtn').addEventListener('touchstart',()=>main.style.display='none')
+    main.addEventListener('touchstart',e=>{
+      drag=true
+      ox=e.touches[0].clientX-main.offsetLeft
+      oy=e.touches[0].clientY-main.offsetTop
+    })
+    main.addEventListener('touchmove',e=>{
+      if(!drag)return
+      main.style.left=e.touches[0].clientX-ox+'px'
+      main.style.top=e.touches[0].clientY-oy+'px'
+    })
+    main.addEventListener('touchend',()=>drag=false)
   </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </body>
-  </html>
+</html>
