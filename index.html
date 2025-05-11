@@ -25,7 +25,7 @@
       padding: 1em;
     }
     button,
-    input[type="button"], /* Target button type inputs as well */
+    input[type="button"],
     input[type="submit"],
     input[type="reset"] {
       background: #003366;
@@ -36,7 +36,7 @@
       font-size: 1em;
       border-radius: 4px;
       transition: background 0.3s;
-      cursor: pointer; /* Add cursor pointer for buttons */
+      cursor: pointer;
     }
     button:hover,
     input[type="button"]:hover,
@@ -45,9 +45,8 @@
       background: #005599;
     }
 
-    /* Style for file input label to make it look like a button */
     input[type="file"] {
-      display: none; /* Hide the default file input */
+      display: none;
     }
     label {
        background: #003366;
@@ -58,8 +57,8 @@
       font-size: 1em;
       border-radius: 4px;
       transition: background 0.3s;
-      cursor: pointer; /* Add cursor pointer */
-      display: inline-block; /* Make label behave like a button */
+      cursor: pointer;
+      display: inline-block;
     }
      label:hover {
       background: #005599;
@@ -74,7 +73,6 @@
        font-size: 1em;
        border-radius: 4px;
        transition: background 0.3s;
-       /* Remove cursor pointer for number input */
     }
 
 
@@ -86,7 +84,7 @@
       padding: 1em;
       width: 90%;
       overflow-x: auto;
-      word-wrap: normal; /* Prevent line breaks within words */
+      word-wrap: normal;
     }
     #progresscontainer {
       width: 80%;
@@ -141,15 +139,16 @@
       <div id="progressbar"></div>
     </div>
     <div id="progressmessage"></div>
-     <div id="note" style="display: none;"></div> <pre id="display"></pre>
+     <div id="note" style="display: none;"></div>
+    <pre id="display"></pre>
   </div>
   <script>
-    let custommedia = null; // Can be Image or Video element
-    let customctx = null; // Context for the canvas drawing the media frame
-    let customcanvas = document.createElement("canvas"); // Canvas for drawing media frame
+    let custommedia = null;
+    let customctx = null;
+    let customcanvas = document.createElement("canvas");
     let custommediatype = null;
     let usecolour = false;
-    let asciiData = []; // Store ASCII data for images or current frame
+    let asciiData = [];
     const charset = ".,-~:;=!*#$@";
     const display = document.getElementById("display");
     const progresscontainer = document.getElementById("progresscontainer");
@@ -164,22 +163,23 @@
     const fpslabel = document.getElementById("fpslabel");
     const noteDiv = document.getElementById("note");
 
-    let recordingCanvas = document.createElement("canvas"); // Canvas for drawing the ASCII art for recording
+    let recordingCanvas = document.createElement("canvas");
     let recordingCtx = recordingCanvas.getContext("2d");
-    // recordingCanvas.style.display = "none"; // Keep visible for debugging if needed, usually hidden
-    // document.body.appendChild(recordingCanvas); // Append if you want to inspect it
 
     let mediaRecorder = null;
     let recordedChunks = [];
-    let processingVideo = false; // Flag to indicate if video is currently being processed for render
+    let processingVideo = false;
+    let currentRenderFrame = 0;
+    let totalRenderFrames = 0;
+    let renderTargetFps = 30;
 
-    // Function to draw a single frame of media onto customcanvas
     function drawMediaFrame() {
       let detail = parseInt(detailsizeinput.value) || 200;
       let aspect = 1;
       if (custommedia.videoWidth && custommedia.videoHeight) {
         aspect = custommedia.videoHeight / custommedia.videoWidth;
       } else if (custommedia.naturalWidth && custommedia.naturalHeight) {
+        aspect = custommedia.naturalHeight / custommedia.naturalHeight; // Should be naturalHeight / naturalWidth
         aspect = custommedia.naturalHeight / custommedia.naturalWidth;
       }
       customcanvas.width = detail;
@@ -187,26 +187,23 @@
       customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height);
     }
 
-    // Function to convert canvas data to ASCII and update display/recordingCanvas
     function convertFrameToAscii() {
       let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data;
-      asciiData = []; // Clear previous frame data
+      asciiData = [];
       let htmlout = "";
       const asciiWidth = customcanvas.width;
       const asciiHeight = customcanvas.height;
 
-      // Calculate recording canvas size based on desired monospace character dimensions
-      // Approximate ratios: width ~0.6 of height, height ~1.2x font size
-      const fontSize = 12; // Base font size for recording
-      const charWidthRatio = 0.6; // Monospace character width relative to height
-      const lineHeightFactor = 1.2; // Line height relative to font size
+      const fontSize = 12;
+      const charWidthRatio = 0.6;
+      const lineHeightFactor = 1.2;
 
       recordingCanvas.width = asciiWidth * fontSize * charWidthRatio;
       recordingCanvas.height = asciiHeight * fontSize * lineHeightFactor;
 
-      recordingCtx.fillStyle = "#0a0a0a"; // Match background color
+      recordingCtx.fillStyle = "#0a0a0a";
       recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
-      recordingCtx.font = `${fontSize}px monospace`; // Set font for drawing
+      recordingCtx.font = `${fontSize}px monospace`;
 
       for (let y = 0; y < asciiHeight; y++) {
         let row = [];
@@ -220,71 +217,80 @@
           let char = charset.charAt(charindex);
           let color = `rgb(${r},${g},${b})`;
 
-          row.push({ char: char, color: color }); // Store for image saving
-          if (usecolour) {
-            htmlout += `<span style="color: ${color}">${char}</span>`;
-          } else {
-            htmlout += char;
+          row.push({ char: char, color: color });
+          if (!processingVideo) {
+             if (usecolour) {
+                htmlout += `<span style="color: ${color}">${char}</span>`;
+             } else {
+                htmlout += char;
+             }
           }
 
-          // Draw character onto recording canvas
-          recordingCtx.fillStyle = color; // Use colour if in colour mode, otherwise default
-          if (!usecolour) {
-             recordingCtx.fillStyle = "#e0e0e0"; // White for B&W mode
-          }
+
+          recordingCtx.fillStyle = usecolour ? color : "#e0e0e0";
           recordingCtx.fillText(char, x * fontSize * charWidthRatio, (y + 1) * fontSize * lineHeightFactor);
         }
-        // For display HTML, add break tag after each row
-        if (!processingVideo) { // Only add <br> for display, not needed for recording canvas
+        if (!processingVideo) {
              htmlout += "<br>";
         }
       }
 
-      // Update the display element only if not actively recording video
-      // During recording, display update is too slow and will cause lag.
-      // We could potentially update the display at a lower rate if needed.
       if (!processingVideo) {
          display.innerHTML = htmlout;
       }
     }
 
-     // --- Video Processing and Recording Logic ---
+    function processNextRenderFrame() {
+         if (!processingVideo) return;
 
-    async function processAndRecordVideo() {
+         const targetTime = currentRenderFrame / renderTargetFps;
+
+         if (targetTime >= custommedia.duration) {
+             mediaRecorder.stop();
+             custommedia.pause();
+             custommedia.muted = true;
+             return;
+         }
+
+         custommedia.currentTime = targetTime;
+         // The actual frame processing (drawMediaFrame, convertFrameToAscii)
+         // happens in the custommedia.onseeked handler
+     }
+
+    async function startVideoRendering() {
         if (!custommedia || custommediatype !== 'video') return;
 
-        processingVideo = true; // Set processing flag
+        processingVideo = true;
         disableButtons(true);
         progresscontainer.style.display = "block";
         progressmessage.textContent = "preparing for recording...";
         noteDiv.style.display = "block";
         noteDiv.textContent = "Note: Audio is played during recording but not saved in the final video file.";
 
-
-        const targetFps = parseInt(fpsinput.value) || 30;
+        renderTargetFps = parseInt(fpsinput.value) || 30;
         const videoDuration = custommedia.duration;
-        const totalFrames = Math.floor(videoDuration * targetFps);
-        let currentFrame = 0;
+        totalRenderFrames = Math.floor(videoDuration * renderTargetFps);
+        currentRenderFrame = 0;
 
-        // Attempt to use mp4 if supported, fallback to webm
         let options = { mimeType: 'video/mp4;codecs=avc1.42E01E' };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-             options = { mimeType: 'video/webm;codecs=vp9' }; // Fallback to VP9 webm
+             options = { mimeType: 'video/webm;codecs=vp9' };
              if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                 options = { mimeType: 'video/webm' }; // Fallback to default webm
+                 options = { mimeType: 'video/webm' };
                  if (!MediaRecorder.isTypeSupported(options.mimeType)) {
                      progressmessage.textContent = "Error: No supported video recording format found.";
                      disableButtons(false);
                      processingVideo = false;
+                     noteDiv.style.display = "none";
+                     noteDiv.textContent = "";
                      return;
                  }
              }
-             noteDiv.textContent += "\n(Using WebM format due to MP4 codec support)";
+             noteDiv.textContent += "\n(Using WebM format)";
         }
 
-
         recordedChunks = [];
-        const stream = recordingCanvas.captureStream(targetFps); // Capture stream at target FPS
+        const stream = recordingCanvas.captureStream(renderTargetFps);
         mediaRecorder = new MediaRecorder(stream, options);
 
         mediaRecorder.ondataavailable = (event) => {
@@ -295,12 +301,12 @@
 
         mediaRecorder.onstop = () => {
             const blob = new Blob(recordedChunks, { type: options.mimeType });
-            saveAs(blob, "ascii_video.mp4"); // Save as mp4 extension, even if webm
+            saveAs(blob, "ascii_video.mp4");
             progressmessage.textContent = "encoding complete";
-             disableButtons(false);
-             processingVideo = false;
-             noteDiv.style.display = "none";
-             noteDiv.textContent = "";
+            disableButtons(false);
+            processingVideo = false;
+            noteDiv.style.display = "none";
+            noteDiv.textContent = "";
 
             setTimeout(() => {
                 progresscontainer.style.display = "none";
@@ -312,88 +318,21 @@
              progressmessage.textContent = "Error during recording: " + event.error.name;
              disableButtons(false);
              processingVideo = false;
-              noteDiv.style.display = "none";
+             noteDiv.style.display = "none";
              noteDiv.textContent = "";
              console.error("MediaRecorder error:", event.error);
         }
 
-        // Reset video to start and start audio playback
         custommedia.currentTime = 0;
-        custommedia.muted = false; // Unmute to play audio
-        custommedia.volume = 1; // Ensure volume is not zero
-        await custommedia.play(); // Start video playback (for audio sync)
-
+        custommedia.muted = false;
+        custommedia.volume = 1;
+        await custommedia.play();
 
         mediaRecorder.start();
 
-        // Use a timer to process frames according to FPS
-        const frameInterval = 1000 / targetFps; // milliseconds per frame
-        let lastTime = performance.now();
-
-        function processFrameLoop(currentTime) {
-             if (!processingVideo) return; // Stop if processing is cancelled
-
-            // Update display on the fly while processing, but maybe at a reduced rate
-            // This makes it look like something is happening, but doesn't guarantee
-            // the display matches the *exact* frame being recorded at this microsecond.
-            // The recording canvas is what matters for the output file.
-            // To avoid slowing down recording, we only update the main display
-            // when not recording, or maybe every N frames during recording.
-             if (Date.now() % 200 < 30) { // Update display roughly 5 times a second
-                  drawMediaFrame();
-                  convertFrameToAscii();
-             }
-
-
-             const elapsed = currentTime - lastTime;
-
-             // Process frames based on elapsed time to maintain target FPS
-             while (elapsed >= frameInterval) {
-                 const targetTime = currentFrame / targetFps;
-                 if (targetTime >= videoDuration) {
-                     // End of video reached
-                     mediaRecorder.stop();
-                     custommedia.pause();
-                     custommedia.muted = true; // Mute again
-                     return;
-                 }
-
-                 // Seek to the target time for the current frame
-                 custommedia.currentTime = targetTime;
-
-                 // Note: We are drawing immediately after setting currentTime.
-                 // A more robust method *could* wait for the 'seeked' event,
-                 // but for smooth recording at a fixed FPS, drawing based on
-                 // target time and hoping the frame is ready is often sufficient
-                 // and necessary to keep up with the recorder.
-
-                 drawMediaFrame(); // Draw the frame at the target time
-                 convertFrameToAscii(); // Convert and draw on recordingCanvas
-
-                 currentFrame++;
-                 lastTime += frameInterval; // Advance last time by the frame interval
-             }
-
-
-            // Update progress bar
-            const percent = Math.min(Math.floor((currentFrame / totalFrames) * 100), 100);
-            const elapsedSeconds = Math.floor(custommedia.currentTime);
-            const remainingSeconds = Math.max(0, Math.floor(videoDuration - custommedia.currentTime));
-
-            progressbar.style.width = percent + "%";
-            progressmessage.textContent = `progress: ${percent}% (${elapsedSeconds}s done, ${remainingSeconds}s left)`;
-
-
-            // Continue the loop using requestAnimationFrame
-            requestAnimationFrame(processFrameLoop);
-        }
-
-        // Start the processing loop
-        requestAnimationFrame(processFrameLoop);
+        processNextRenderFrame(); // Start the frame processing loop
     }
 
-
-    // --- Event Listeners ---
 
     document.getElementById("mediainput").addEventListener("change", (event) => {
       const fileinput = event.target;
@@ -401,14 +340,12 @@
       let file = fileinput.files[0];
       let url = URL.createObjectURL(file);
 
-      // Clean up previous media element if exists
       if (custommedia) {
           if (custommedia.tagName === 'VIDEO') {
               custommedia.pause();
               custommedia.removeAttribute('src');
-              custommedia.load(); // Release resources
+              custommedia.load();
           }
-          // custommedia = null; // Don't null yet, may need properties
       }
 
       if (file.type.startsWith("image")) {
@@ -418,144 +355,158 @@
         processbutton.style.display = "inline-block";
         processandrenderbutton.style.display = "none";
         fpslabel.style.display = "none";
-         noteDiv.style.display = "none";
-         noteDiv.textContent = "";
-
+        noteDiv.style.display = "none";
+        noteDiv.textContent = "";
+        display.style.whiteSpace = 'pre';
 
         custommedia = new Image();
         custommedia.onload = () => {
           customcanvas = document.createElement("canvas");
           customctx = customcanvas.getContext("2d");
-           // Display the initial image ASCII
-          drawMediaFrame();
-          convertFrameToAscii();
-           // Clear display if previously showing video ASCII
-           if (display.innerHTML.includes('<br>')) {
-               display.innerHTML = ''; // Clear video frames
-           }
-           drawMediaFrame(); // Redraw for current size
-           convertFrameToAscii(); // Convert and display
-           display.style.whiteSpace = 'pre'; // Ensure pre wraps correctly for image output
+          // Optional: Auto-process image on load
+          // drawMediaFrame();
+          // convertFrameToAscii();
         }
         custommedia.onerror = () => {
             progressmessage.textContent = "Error loading image.";
-             setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+            setTimeout(() => { progressmessage.textContent = ""; }, 2000);
         }
         custommedia.src = url;
-        // No need to revokeObjectURL immediately for images, will be GCed or on next file select
+
       } else if (file.type.startsWith("video")) {
         custommediatype = "video";
         processbutton.textContent = "process video (first frame)";
-        savebutton.textContent = "render video"; // This button will now trigger recording
-         processbutton.style.display = "inline-block";
-         processandrenderbutton.style.display = "inline-block"; // Show the dedicated render button
+        savebutton.textContent = "render video";
+        processbutton.style.display = "inline-block";
+        processandrenderbutton.style.display = "inline-block";
         fpslabel.style.display = "inline-block";
-         noteDiv.style.display = "block";
-         noteDiv.textContent = "Click 'process video' to see the first frame or 'process and render video' to generate the full video.";
-
+        noteDiv.style.display = "block";
+        noteDiv.textContent = "Click 'process video' to see the first frame or 'process and render video' to generate the full video.";
+        display.style.whiteSpace = 'pre-wrap';
 
         custommedia = document.createElement("video");
-        // custommedia.crossOrigin = "anonymous"; // May be needed depending on video source origin
-        custommedia.autoplay = false; // Don't autoplay automatically
+        custommedia.autoplay = false;
         custommedia.loop = false;
-        custommedia.muted = true; // Start muted
-         display.style.whiteSpace = 'pre-wrap'; // Allow wrapping for faster display during playback/processing
+        custommedia.muted = true;
 
         custommedia.onloadedmetadata = () => {
              customcanvas = document.createElement("canvas");
              customctx = customcanvas.getContext("2d");
-             // Display the first frame
-             custommedia.currentTime = 0; // Seek to beginning
+             custommedia.currentTime = 0; // Seek to beginning to load first frame metadata
         }
+
         custommedia.onseeked = () => {
-             // Only display the frame on seeked if we are not actively processing for recording
-             if (!processingVideo) {
-                 drawMediaFrame();
-                 convertFrameToAscii();
+             // This handler is called after any seek operation (user click, programatic seek)
+             drawMediaFrame();
+             convertFrameToAscii(); // Convert and draw on recording canvas
+
+             if (processingVideo) {
+                  // If we are in the middle of a video render process, continue to the next frame
+                 currentRenderFrame++;
+                 const percent = Math.min(Math.floor((currentRenderFrame / totalRenderFrames) * 100), 100);
+                 const elapsedSeconds = Math.floor(custommedia.currentTime);
+                 const remainingSeconds = Math.max(0, Math.floor(custommedia.duration - custommedia.currentTime));
+
+                 progressbar.style.width = percent + "%";
+                 progressmessage.textContent = `progress: ${percent}% (${elapsedSeconds}s done, ${remainingSeconds}s left)`;
+
+                 // Process the next frame
+                 processNextRenderFrame();
+             } else {
+                  // If not processing video, this seek was likely from user interaction
+                  // Update the display with the current frame's ASCII
+                  let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data;
+                  let htmlout = "";
+                  const asciiWidth = customcanvas.width;
+                  for (let y = 0; y < customcanvas.height; y++) {
+                     for (let x = 0; x < asciiWidth; x++) {
+                        let i = (y * asciiWidth + x) * 4;
+                        let r = imgdata[i];
+                        let g = imgdata[i + 1];
+                        let b = imgdata[i + 2];
+                        let color = `rgb(${r},${g},${b})`;
+                         let brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                         let charindex = Math.floor((brightness / 255) * (charset.length - 1));
+                         let char = charset.charAt(charindex);
+
+                        if (usecolour) {
+                            htmlout += `<span style="color: ${color}">${char}</span>`;
+                        } else {
+                            htmlout += char;
+                        }
+                     }
+                     htmlout += "<br>";
+                  }
+                  display.innerHTML = htmlout;
              }
         }
          custommedia.onerror = () => {
             progressmessage.textContent = "Error loading video.";
-             setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+            setTimeout(() => { progressmessage.textContent = ""; }, 2000);
         }
         custommedia.src = url;
-        // URL.revokeObjectURL(url); // Revoke immediately after setting src is not safe for video
+
       } else {
            progressmessage.textContent = "Unsupported file type selected.";
            custommediatype = null;
            custommedia = null;
            display.innerHTML = "";
-            processbutton.style.display = "inline-block"; // Reset buttons
-            processandrenderbutton.style.display = "none";
-            savebutton.textContent = "save ascii";
-            fpslabel.style.display = "none";
-             noteDiv.style.display = "none";
-             noteDiv.textContent = "";
-
+           processbutton.style.display = "inline-block";
+           processandrenderbutton.style.display = "none";
+           savebutton.textContent = "save ascii";
+           fpslabel.style.display = "none";
+           noteDiv.style.display = "none";
+           noteDiv.textContent = "";
            setTimeout(() => { progressmessage.textContent = ""; }, 2000);
       }
     });
 
-    // "Process" button listener (mainly for images, or first video frame)
     processbutton.addEventListener("click", () => {
       if (!custommedia) {
            progressmessage.textContent = "Please select a file first.";
-            setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+           setTimeout(() => { progressmessage.textContent = ""; }, 2000);
            return;
       }
       if (custommediatype === 'image') {
          drawMediaFrame();
-         convertFrameToAscii();
+         convertFrameToAscii(); // This populates asciiData and updates display/recordingCanvas
       } else if (custommediatype === 'video') {
-         // Process and display the current frame (likely the first after load)
-          custommedia.currentTime = 0; // Ensure we show the first frame
-          // seeked event listener will handle the drawing and conversion
+         // For video, just seek to the current time (or 0) to trigger a seeked event
+         // The seeked handler will draw and convert for display
+          custommedia.currentTime = custommedia.currentTime || 0; // Seek to current or start
       }
     });
 
-
-    // "Process and Render Video" button listener
      processandrenderbutton.addEventListener("click", () => {
          if (!custommedia || custommediatype !== 'video') {
               progressmessage.textContent = "Please select a video file first.";
               setTimeout(() => { progressmessage.textContent = ""; }, 2000);
               return;
          }
-         // Start the video processing and recording
-         processAndRecordVideo();
+         startVideoRendering();
      });
 
-
-    // "Save ASCII" button listener (for image saving, or triggers video render now)
-    // Note: This button's text changes based on media type
     savebutton.addEventListener("click", () => {
       if (!custommedia) {
            progressmessage.textContent = "Nothing to save.";
-            setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+           setTimeout(() => { progressmessage.textContent = ""; }, 2000);
            return;
       }
 
       if (custommediatype === "video") {
-         // If the "save" button is clicked for a video, trigger the render process
-         // This provides an alternative way to start rendering if the dedicated button isn't used.
-         processAndRecordVideo();
+         // If save is clicked for video, trigger render
+         startVideoRendering();
       } else {
-        // for images, just save a snapshot as before
-        // Reuse the recordingCanvas logic for consistent output style
-        const rows = asciiData.length;
-        if (rows === 0) { // Check if asciiData is empty (e.g., process wasn't clicked for image)
+        // For images, save the recorded canvas content
+        if (asciiData.length === 0) { // Check if asciiData is populated (process clicked)
              progressmessage.textContent = "Please click 'process image' first.";
              setTimeout(() => { progressmessage.textContent = ""; }, 2000);
              return;
         }
-        const cols = asciiData[0].length;
-
-        // We already drew on recordingCanvas during convertFrameToAscii for the image
-        // So just get the blob from recordingCanvas
         recordingCanvas.toBlob(blob => {
           saveAs(blob, "ascii_art.png");
-           progressmessage.textContent = "Image saved!";
-           setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+          progressmessage.textContent = "Image saved!";
+          setTimeout(() => { progressmessage.textContent = ""; }, 2000);
         });
       }
     });
@@ -563,33 +514,29 @@
     togglecolourbutton.addEventListener("click", function () {
       usecolour = !usecolour;
       this.textContent = usecolour ? "colour mode on" : "colour mode off";
-      // Re-render the current frame/image with new colour setting
-      if (custommedia && custommediatype === 'image' && asciiData.length > 0) {
-           drawMediaFrame(); // Redraw media just in case
-           convertFrameToAscii(); // Convert and display with new color setting
-      } else if (custommedia && custommediatype === 'video' && custommedia.readyState >= 2) { // Check if video is ready enough
-            // For video, just update the display of the current frame
-            drawMediaFrame();
-            convertFrameToAscii();
-      } else if (custommedia) {
-           progressmessage.textContent = "Processing to apply colour change...";
-            // Attempt to re-process if media is loaded but not yet processed
-           if (custommediatype === 'image') processbutton.click();
-           else if (custommediatype === 'video') custommedia.currentTime = custommedia.currentTime; // Trigger seeked for current time
-            setTimeout(() => { progressmessage.textContent = ""; }, 1000);
+      // Re-render the current view with the new colour setting
+      if (custommedia && custommediatype === 'image') {
+           if (asciiData.length > 0) { // Only re-render if image was processed
+               drawMediaFrame();
+               convertFrameToAscii();
+           }
+      } else if (custommedia && custommediatype === 'video' && custommedia.readyState >= 2) {
+            // Trigger a seek to the current time to re-render the display with new colour
+            custommedia.currentTime = custommedia.currentTime;
       }
     });
 
      detailsizeinput.addEventListener("change", () => {
-         // Re-process the current frame/image when detail size changes
-         if (custommedia && custommediatype === 'image' && asciiData.length > 0) {
-              drawMediaFrame();
-              convertFrameToAscii();
+         // Re-render the current view with the new detail size
+         if (custommedia && custommediatype === 'image') {
+             if (asciiData.length > 0) { // Only re-render if image was processed
+                drawMediaFrame();
+                convertFrameToAscii();
+             }
          } else if (custommedia && custommediatype === 'video' && custommedia.readyState >= 2) {
-             custommedia.currentTime = custommedia.currentTime; // Trigger seeked to redraw current frame
+             custommedia.currentTime = custommedia.currentTime; // Trigger seeked
          }
      });
-
 
     function disableButtons(disabled) {
         processbutton.disabled = disabled;
@@ -600,7 +547,6 @@
         fpsinput.disabled = disabled;
         document.getElementById("mediainput").disabled = disabled;
         document.querySelector('label[for="mediainput"]').style.pointerEvents = disabled ? 'none' : 'auto';
-
     }
 
   </script>
