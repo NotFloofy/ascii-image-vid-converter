@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>ascii converter</title>
+  <title>Custom ASCII Converter</title>
   <script>
     if (/mobi|android/i.test(navigator.userAgent)) {
       let meta = document.createElement("meta");
@@ -75,6 +75,14 @@
        transition: background 0.3s;
     }
 
+    #filename-display {
+        margin: 0.5em 0;
+        font-size: 0.9em;
+        color: #aaaaaa;
+        min-height: 1.2em; /* Reserve space */
+    }
+
+
     #media-container {
       /* Container for the actual video element if needed for playback */
        position: absolute; /* Hide the video element */
@@ -130,12 +138,12 @@
 </head>
 <body>
   <div class="container">
-    <h3>custom ascii stuff</h3>
+    <h3>Custom ASCII Converter</h3>
     <label>
       Select File
       <input type="file" id="mediainput" accept="image/*,video/*">
     </label>
-    <label>
+    <div id="filename-display"></div> <label>
       Detail Size (Columns)
       <input type="number" id="detailsize" value="200" min="50" step="10">
     </label>
@@ -174,10 +182,12 @@
     const detailsizeinput = document.getElementById("detailsize");
     const renderfpsinput = document.getElementById("renderfps");
     const renderfpslabel = document.getElementById("renderfpslabel");
-    const playbackfpsinput = document.getElementById("playbackfpsinput");
+    const playbackfpsinput = document.getElementById("playbackfps"); // Corrected ID
     const playbackfpslabel = document.getElementById("playbackfpslabel");
     const noteDiv = document.getElementById("note");
     const mediaContainer = document.getElementById("media-container");
+    const filenameDisplay = document.getElementById("filename-display"); // Added filename element
+
 
     // --- Canvases ---
     // Temporary canvas for drawing media frame before processing pixels
@@ -203,6 +213,7 @@
     let videoPlaybackLoopId = null;
     let videoPlaybackFps = 20; // Default
     let isPlayingAscii = false;
+    let rVFCId = null; // ID for requestVideoFrameCallback loop
 
     // --- Video Rendering State ---
     let mediaRecorder = null;
@@ -212,6 +223,7 @@
     let totalRenderFrames = 0;
     let renderTargetFps = 30; // Default
     let renderSeekTimeout = null;
+    let renderStartTime = 0;
 
 
     // --- Constants ---
@@ -265,11 +277,11 @@
            progressmessage.textContent = "Error accessing pixel data (CORS issue?).";
            setTimeout(() => { progressmessage.textContent = ""; }, 3000);
            disableButtons(false);
-           if(processingVideoForRender && mediaRecorder) {
+           if(processingVideoForRender && mediaRecorder && mediaRecorder.state !== 'inactive') {
               mediaRecorder.stop(); // Attempt to stop recording on error
            }
            processingVideoForRender = false;
-           isPlayingAscii = false; // Stop playback loop
+           stopAsciiPlayback(); // Stop playback loop if running
            return;
       }
 
@@ -277,7 +289,7 @@
       const asciiWidth = processingCanvas.width;
       const asciiHeight = processingCanvas.height;
 
-      // Calculate font size based on desired output canvas size
+      // Calculate font size based on desired output canvas size relative to container width
       const displayFontSize = baseFontSize * (displayDiv.clientWidth / (asciiWidth * baseFontSize * charWidthRatio)) || baseFontSize; // Scale font to fit display div width
       const recordingFontSize = baseFontSize; // Keep consistent font size for recording
 
@@ -307,7 +319,10 @@
       recordingCtx.textBaseline = "top"; // Align text properly
 
 
-      asciiData = []; // Clear previous data (only relevant for saving static image)
+      if(custommediatype !== 'video' || !processingVideoForRender) {
+          asciiData = []; // Clear previous data (only relevant for saving static image, or for first frame)
+      }
+
 
       // Convert pixels to ASCII characters and draw
       for (let y = 0; y < asciiHeight; y++) {
@@ -322,42 +337,55 @@
           let char = charset.charAt(charindex);
           let color = `rgb(${r},${g},${b})`;
 
-          row.push({ char: char, color: color }); // Store for static save
+          if(custommediatype !== 'video' || !processingVideoForRender) {
+             row.push({ char: char, color: color }); // Store for static save
+          }
+
 
           // Draw to display canvas
           displayCtx.fillStyle = usecolour ? color : "#e0e0e0";
           displayCtx.fillText(char, x * displayFontSize * charWidthRatio, y * displayFontSize * lineHeightFactor);
 
-          // Draw to recording canvas (using constant recording font size)
-          recordingCtx.fillStyle = usecolour ? color : "#e0e0e0";
-          recordingCtx.fillText(char, x * recordingFontSize * charWidthRatio, y * recordingFontSize * lineHeightFactor);
+          // Draw to recording canvas (only needed when rendering video)
+          if (processingVideoForRender) {
+              recordingCtx.fillStyle = usecolour ? color : "#e0e0e0";
+              recordingCtx.fillText(char, x * recordingFontSize * charWidthRatio, y * recordingFontSize * lineHeightFactor);
+          }
         }
-        if(custommediatype !== 'video' || !processingVideoForRender) {
-             // Only store asciiData for static image save or first frame
-             asciiData.push(row);
-        }
+         if(custommediatype !== 'video' || !processingVideoForRender) {
+            asciiData.push(row); // Store for static save
+         }
       }
     }
 
     // --- Video Playback (Display) Logic ---
     function startAsciiPlayback() {
-        if (custommediatype !== 'video' || processingVideoForRender || isPlayingAscii) return;
+        if (!custommedia || custommediatype !== 'video' || processingVideoForRender || isPlayingAscii) return;
 
         isPlayingAscii = true;
         videoPlaybackFps = parseInt(playbackfpsinput.value) || 20;
-        custommedia.muted = true; // Keep the original video silent
+        custommedia.muted = true; // Keep the original video silent for playback
         custommedia.volume = 0;
         custommedia.currentTime = 0; // Start from the beginning
         custommedia.play().catch(e => {
              console.error("Error starting video playback:", e);
              progressmessage.textContent = "Error starting video playback.";
              setTimeout(() => { progressmessage.textContent = ""; }, 3000);
-             isPlayingAscii = false;
+             isPlayingAscii = false; // Ensure state is correct
              disableButtons(false);
         });
 
-        // Request the first frame
-         requestVideoFrameCallback(custommedia, updateAsciiDisplayFrame);
+        // Use rVFC for smoother updates if available
+         if ('requestVideoFrameCallback' in custommedia) {
+             console.log("Using requestVideoFrameCallback for display sync.");
+              // Start the rVFC loop
+             rVFCId = custommedia.requestVideoFrameCallback(updateAsciiDisplayFrame);
+         } else {
+             // Fallback using timeupdate listener
+              console.warn("requestVideoFrameCallback not supported, falling back to timeupdate.");
+             custommedia.ontimeupdate = fallbackTimeUpdate;
+         }
+
 
          processbutton.textContent = "Pause Playback";
 
@@ -369,13 +397,22 @@
     }
 
     function stopAsciiPlayback() {
-        if (!isPlayingAscii) return;
+        if (!custommedia || custommediatype !== 'video' || !isPlayingAscii) return;
 
         isPlayingAscii = false;
-        if (custommedia && custommediatype === 'video') {
-            custommedia.pause();
-            // No need to cancel rVFC explicitly, the loop function checks isPlayingAscii
-        }
+        custommedia.pause();
+
+        // Cancel the rVFC loop if it was running
+         if (rVFCId) {
+             // The callback function itself also checks isPlayingAscii, but cancelling is cleaner
+             // custommedia.cancelVideoFrameCallback(rVFCId); // This method doesn't exist, loop exits by check
+             rVFCId = null;
+         }
+
+         // Remove the timeupdate listener if fallback was used
+         custommedia.ontimeupdate = null;
+
+
          processbutton.textContent = "Start Playback";
          noteDiv.style.display = "block";
          noteDiv.textContent = "Playback paused. Click 'Start Playback' to resume or 'Process and Render' to create a new video file.";
@@ -387,15 +424,18 @@
 
     // Use requestVideoFrameCallback for smoother updates aligned with browser's rendering
     function updateAsciiDisplayFrame(now, metadata) {
+         // Stop if playback is off or rendering is happening
          if (!isPlayingAscii || custommediatype !== 'video' || processingVideoForRender) {
-             return; // Stop if playback is off or rendering is happening
+             rVFCId = null; // Ensure ID is cleared when stopping
+             return;
          }
 
-         // Draw the current video frame to canvases
+         // Draw the current video frame to canvases (only displayCanvas needs update here)
+         // drawFrameAndConvert handles drawing to both, but we only need displayCtx update during playback
          drawFrameAndConvert();
 
          // Request the next frame callback
-         requestVideoFrameCallback(custommedia, updateAsciiDisplayFrame);
+         rVFCId = custommedia.requestVideoFrameCallback(updateAsciiDisplayFrame);
     }
 
     // Fallback using timeupdate if requestVideoFrameCallback is not supported
@@ -406,10 +446,18 @@
          // Check if enough time has passed based on target FPS
          const now = performance.now();
          const frameInterval = 1000 / videoPlaybackFps;
-         if (!this.lastFrameTime || (now - this.lastFrameTime) > frameInterval) {
-             this.lastFrameTime = now - ((now - this.lastFrameTime) % frameInterval); // Adjust last time
+
+         // Only draw if the elapsed time is greater than the desired frame interval
+         // Use the browser's currentTime to potentially get slightly better sync
+         // compared to a simple time delta from performance.now()
+         const currentTime = custommedia.currentTime * 1000; // Convert to milliseconds
+
+         if (!this.lastFrameTime || (currentTime - this.lastFrameTime) > frameInterval - 5) { // Add tolerance
+              // Update last frame time to the current video time
+             this.lastFrameTime = currentTime;
              drawFrameAndConvert();
          }
+         // Note: This fallback can still be less smooth or accurate than rVFC
     }
 
 
@@ -418,15 +466,21 @@
          if (!processingVideoForRender || !custommedia) return;
 
          // Calculate the target time for the current frame
+         // Add a small epsilon to avoid floating point issues or seeking to the very end multiple times
          const targetTime = currentRenderFrame / renderTargetFps;
+         const duration = custommedia.duration;
+         const epsilon = 0.001; // Small tolerance
 
-         // Check if we are past the video duration
-         if (targetTime >= custommedia.duration) {
+         // Check if we are past the video duration (account for tolerance)
+         if (targetTime >= duration - epsilon) {
+              console.log("Reached end of video for rendering.");
              if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop(); // Stop MediaRecorder when done
              }
              custommedia.pause(); // Pause the original video
              custommedia.muted = true; // Ensure it's silent
+             if(renderSeekTimeout) clearTimeout(renderSeekTimeout);
+             renderSeekTimeout = null;
              return; // Stop the rendering loop
          }
 
@@ -438,30 +492,32 @@
 
           // Set a timeout as a fallback in case 'seeked' doesn't fire reliably
          renderSeekTimeout = setTimeout(() => {
-             console.warn(`Timeout waiting for seeked event at ${targetTime}s. Proceeding to next frame.`);
+             console.warn(`Timeout waiting for seeked event at ${targetTime.toFixed(3)}s. Processing frame manually.`);
               // Manually draw and process if seeked timeout occurs (might cause frame skips)
               if (custommedia.readyState >= 2) { // Ensure metadata is loaded
-                 drawFrameAndConvert();
+                 drawFrameAndConvert(); // Draw the frame that *should* be there
               }
               currentRenderFrame++; // Move to next frame
               updateProgress();
               processNextRenderFrame(); // Request the next frame
-         }, 500); // Adjust timeout duration if needed
+         }, 500); // Adjust timeout duration if needed - depends on browser speed
 
      }
 
      function updateProgress() {
           const percent = Math.min(Math.floor((currentRenderFrame / totalRenderFrames) * 100), 100);
-          const elapsedSeconds = Math.floor(custommedia.currentTime);
-          const remainingSeconds = Math.max(0, Math.floor(custommedia.duration - custommedia.currentTime)); // This is a rough estimate based on current time
-
           progressbar.style.width = percent + "%";
           progressmessage.textContent = `Rendering: ${percent}% (${currentRenderFrame}/${totalRenderFrames} frames)`; // Showing frame count is more accurate for rendering
 
            // Attempt to estimate time remaining (can be inaccurate due to seeking overhead)
-           // let estimatedTimePerFrame = (performance.now() - renderStartTime) / currentRenderFrame;
-           // let estimatedRemainingTime = (totalRenderFrames - currentRenderFrame) * estimatedTimePerFrame;
-           // progressmessage.textContent += ` - Est. time remaining: ${Math.floor(estimatedRemainingTime / 1000)}s`;
+            if(currentRenderFrame > 0 && renderStartTime > 0) {
+                const elapsedMs = performance.now() - renderStartTime;
+                const estimatedTimePerFrameMs = elapsedMs / currentRenderFrame;
+                const remainingFrames = totalRenderFrames - currentRenderFrame;
+                const estimatedRemainingTimeMs = remainingFrames * estimatedTimePerFrameMs;
+                 const estimatedRemainingSeconds = Math.floor(estimatedRemainingTimeMs / 1000);
+                 progressmessage.textContent += ` - Est. time left: ${estimatedRemainingSeconds}s`;
+            }
 
      }
 
@@ -480,13 +536,14 @@
         progresscontainer.style.display = "block";
         progressmessage.textContent = "Preparing for rendering...";
         noteDiv.style.display = "block";
-        noteDiv.textContent = "Note: Audio is played during rendering preview but NOT saved in the final video file.";
+        noteDiv.textContent = "Note: Audio from the original video is played during rendering preview but NOT saved in the final video file.";
 
         renderTargetFps = parseInt(renderfpsinput.value) || 30;
         const videoDuration = custommedia.duration;
         totalRenderFrames = Math.floor(videoDuration * renderTargetFps);
         currentRenderFrame = 0;
-         let renderStartTime = performance.now();
+        renderStartTime = performance.now(); // Record start time
+
 
         let options = { mimeType: 'video/mp4;codecs=avc1.42E01E' }; // Try MP4 first (better compatibility)
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
@@ -519,12 +576,16 @@
 
         mediaRecorder.onstop = () => {
             const blob = new Blob(recordedChunks, { type: options.mimeType });
-            saveAs(blob, "ascii_video." + options.mimeType.split('/')[1].split(';')[0]); // Use correct extension
+            // Determine file extension from mime type
+            const fileExtension = options.mimeType.split('/')[1].split(';')[0];
+            saveAs(blob, `ascii_video.${fileExtension}`);
+
             progressmessage.textContent = "Encoding complete!";
             disableButtons(false);
             processingVideoForRender = false;
             noteDiv.style.display = "none";
             noteDiv.textContent = "";
+            renderStartTime = 0; // Reset start time
             console.log("Recording stopped. Blob created.");
 
              // Optionally restart playback after rendering finishes
@@ -543,6 +604,7 @@
              processingVideoForRender = false;
              noteDiv.style.display = "none";
              noteDiv.textContent = "";
+             renderStartTime = 0; // Reset start time
 
              // Attempt to stop playback if it started
              stopAsciiPlayback();
@@ -563,7 +625,7 @@
         // The video itself won't be displayed, only its audio will play during render.
          custommedia.muted = false; // Unmute for audio preview
          custommedia.volume = 1;
-         custommedia.currentTime = 0;
+         custommedia.currentTime = 0; // Ensure starting from the beginning
          await custommedia.play().catch(e => console.warn("Playback during render failed:", e)); // Play might fail if muted=false and autoplay is blocked
 
 
@@ -586,10 +648,13 @@
       let file = fileinput.files[0];
       let url = URL.createObjectURL(file);
 
-      // Clean up previous media
+      // Clean up previous media and reset state
       resetState();
 
+      // Display the selected filename
+      filenameDisplay.textContent = `Selected file: ${file.name}`;
       progressmessage.textContent = `Loading ${file.name}...`;
+
 
       if (file.type.startsWith("image")) {
         custommediatype = "image";
@@ -611,7 +676,7 @@
         custommedia.onerror = () => {
             progressmessage.textContent = "Error loading image.";
             setTimeout(() => { progressmessage.textContent = ""; }, 3000);
-             resetState();
+             resetState(); // Reset on error
         }
         custommedia.src = url;
 
@@ -641,7 +706,8 @@
 
 
         custommedia.onloadedmetadata = () => {
-             progressmessage.textContent = "Video metadata loaded.";
+             progressmessage.textContent = "Video metadata loaded. Ready to process.";
+             setTimeout(() => { progressmessage.textContent = ""; }, 3000);
              // Initial draw of the first frame when metadata is ready
              custommedia.currentTime = 0; // Seek to start to get a frame
               // The seeked handler will draw
@@ -650,9 +716,26 @@
         // This handler is crucial for both initial frame, manual seeks, and rendering seeks
         custommedia.onseeked = () => {
              if(renderSeekTimeout) clearTimeout(renderSeekTimeout); // Clear timeout if seeked fired
+              renderSeekTimeout = null; // Reset timeout ID
+
 
              // Draw the frame that was seeked to
-             drawFrameAndConvert();
+             if (custommedia.readyState >= 2) { // Ensure video frame is actually ready
+                  drawFrameAndConvert();
+             } else {
+                  console.warn("Seeked fired, but video not ready. State:", custommedia.readyState);
+                   if (processingVideoForRender) {
+                        // If rendering, still try to process the next frame after a short delay
+                        // This might happen if seeking is very fast or skips frames
+                        setTimeout(() => {
+                           currentRenderFrame++; // Move to next frame
+                           updateProgress();
+                           processNextRenderFrame();
+                        }, 10); // Small delay before trying next frame
+                   }
+                   return; // Don't process/update if not ready
+             }
+
 
              // If we are in the rendering process, trigger the next frame seek
              if (processingVideoForRender) {
@@ -662,6 +745,7 @@
              } else {
                  // If not rendering, just update display after a manual seek or initial load seek
                  // The displayCanvas is already updated by drawFrameAndConvert
+                 // No need to do anything else here for playback/display mode
              }
         }
 
@@ -674,21 +758,27 @@
              // Fallback for browsers without rVFC
               console.warn("requestVideoFrameCallback not supported, falling back to timeupdate.");
              custommedia.ontimeupdate = fallbackTimeUpdate;
+              // Need to store last frame time for fallbackTimeUpdate
+             custommedia.lastFrameTime = 0;
          }
 
 
          custommedia.onerror = (e) => {
             console.error("Video error:", e);
-            progressmessage.textContent = `Error loading video (${e.target.error.code}).`;
-            setTimeout(() => { progressmessage.textContent = ""; }, 3000);
-             resetState();
+            progressmessage.textContent = `Error loading video (${e.target.error.message || e.target.error.code}).`;
+            setTimeout(() => { progressmessage.textContent = ""; }, 5000);
+             resetState(); // Reset on error
         }
 
          custommedia.onplay = () => {
              console.log("Native video started playing.");
-             // If playing for ASCII display, the rVFC/timeupdate handler manages drawing
-             if (isPlayingAscii && 'requestVideoFrameCallback' in custommedia) {
-                  requestVideoFrameCallback(custommedia, updateAsciiDisplayFrame); // Ensure callback loop is running
+             // If playing for ASCII display, ensure rVFC/timeupdate loop is active
+             if (isPlayingAscii) {
+                 if ('requestVideoFrameCallback' in custommedia && rVFCId === null) {
+                     rVFCId = custommedia.requestVideoFrameCallback(updateAsciiDisplayFrame);
+                 } else if (!('requestVideoFrameCallback' in custommedia) && custommedia.ontimeupdate === null) {
+                     custommedia.ontimeupdate = fallbackTimeUpdate;
+                 }
              }
          }
 
@@ -696,14 +786,15 @@
              console.log("Native video paused.");
               // If paused from ASCII playback, stop the loop
               if (!processingVideoForRender) {
-                 // isPlayingAscii state handles stopping the rVFC loop
+                 stopAsciiPlayback(); // This clears rVFCId or timeupdate
               }
          }
 
          custommedia.onended = () => {
              console.log("Native video ended.");
               if (isPlayingAscii) {
-                  // The loop=true on the video element handles restarting playback
+                  // The loop=true on the video element handles restarting playback,
+                  // which will trigger 'play' and restart the rVFC/timeupdate loop.
                   // If loop was false, you'd stop the ASCII playback here: stopAsciiPlayback();
               }
          }
@@ -714,7 +805,7 @@
       } else {
            progressmessage.textContent = "Unsupported file type selected.";
            setTimeout(() => { progressmessage.textContent = ""; }, 3000);
-           resetState();
+           resetState(); // Reset on unsupported type
       }
     });
 
@@ -730,6 +821,7 @@
          // Process and draw a static image
          drawFrameAndConvert();
          progressmessage.textContent = "Image processed.";
+         savebutton.style.display = "inline-block"; // Show save button for images
          setTimeout(() => { progressmessage.textContent = ""; }, 2000);
 
       } else if (custommediatype === 'video') {
@@ -748,7 +840,7 @@
      processandrenderbutton.addEventListener("click", () => {
          if (!custommedia || custommediatype !== 'video') {
               progressmessage.textContent = "Please select a video file first.";
-              setTimeout(() => { progressmessage.textContent = ""; }, 2000);
+              setTimeout(() => { progressmessage.textContent = ""; }, 3000);
               return;
          }
          startVideoRendering(); // Starts the process of generating a new video file
@@ -769,15 +861,15 @@
         const charAspectRatio = charWidthRatio;
         const lineHeight = fontSize * lineHeightFactor;
         const canvasw = cols * fontSize * charAspectRatio;
-        const canvash = rows * lineHeight;
+        const canvah = rows * lineHeight;
 
         const offcanvas = document.createElement("canvas");
         offcanvas.width = canvasw;
-        offcanvas.height = canvash;
+        offcanvas.height = canvah;
         const offctx = offcanvas.getContext("2d");
 
         offctx.fillStyle = "#0a0a0a";
-        offctx.fillRect(0, 0, canvasw, canvash);
+        offctx.fillRect(0, 0, canvasw, canvah);
         offctx.font = `${fontSize}px monospace`;
         offctx.textBaseline = "top";
 
@@ -835,13 +927,10 @@
 
      // Playback FPS input change
      playbackfpsinput.addEventListener("change", () => {
-        if (custommediatype === 'video' && isPlayingAscii) {
+        if (custommediatype === 'video') {
              videoPlaybackFps = parseInt(playbackfpsinput.value) || 20;
-             // The rVFC/timeupdate loop will adapt to the new FPS setting automatically
-             console.log("Playback FPS updated to:", videoPlaybackFps);
-        } else if (custommediatype === 'video') {
-             videoPlaybackFps = parseInt(playbackfpsinput.value) || 20;
-             console.log("Playback FPS set for next start:", videoPlaybackFps);
+             console.log("Playback FPS set:", videoPlaybackFps);
+             // If playing, the rVFC/timeupdate loop will adapt to the new FPS setting
         }
      });
 
@@ -875,19 +964,20 @@
     function resetState() {
          // Stop any ongoing processes
          if (isPlayingAscii) {
-             stopAsciiPlayback();
+             stopAsciiPlayback(); // Handles clearing rVFC/timeupdate
          }
          if (processingVideoForRender && mediaRecorder && mediaRecorder.state !== 'inactive') {
              mediaRecorder.stop(); // This will trigger the onstop handler
          }
-         processingVideoForRender = false;
-         isPlayingAscii = false;
+         processingVideoForRender = false; // Ensure this is false immediately
+         isPlayingAscii = false; // Ensure this is false immediately
          recordedChunks = [];
          asciiData = [];
          currentRenderFrame = 0;
          totalRenderFrames = 0;
          if(renderSeekTimeout) clearTimeout(renderSeekTimeout);
          renderSeekTimeout = null;
+         renderStartTime = 0;
 
          // Clean up media element
          if (custommedia) {
@@ -895,6 +985,18 @@
                  custommedia.pause();
                  custommedia.removeAttribute('src');
                  custommedia.load(); // Clear the video source
+                 // Remove event listeners specific to the video element to prevent memory leaks
+                 if ('requestVideoFrameCallback' in custommedia) {
+                     // rVFC doesn't need explicit removal if the element is removed/source cleared
+                 } else {
+                      custommedia.ontimeupdate = null; // Remove fallback listener
+                 }
+                 custommedia.onseeked = null;
+                 custommedia.onerror = null;
+                 custommedia.onplay = null;
+                 custommedia.onpause = null;
+                 custommedia.onended = null;
+                 custommedia.lastFrameTime = 0; // Reset fallback time
                  mediaContainer.innerHTML = ''; // Remove the video element from the DOM
              }
              custommedia = null;
@@ -902,19 +1004,26 @@
          custommediatype = null;
 
          // Reset UI
+         filenameDisplay.textContent = ''; // Clear filename display
          progressbar.style.width = "0%";
          progresscontainer.style.display = "none";
          progressmessage.textContent = "";
          noteDiv.style.display = "none";
          noteDiv.textContent = "";
 
+         // Clear canvases visually (dimensions might remain)
          displayCtx.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
          recordingCtx.clearRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+          // Reset canvas dimensions to default or small size if preferred
+          displayCanvas.width = 0;
+          displayCanvas.height = 0;
+          recordingCanvas.width = 0;
+          recordingCanvas.height = 0;
 
 
          processbutton.textContent = "Process Image"; // Default state
          savebutton.textContent = "Save ASCII Image"; // Default state
-         savebutton.style.display = "inline-block";
+         savebutton.style.display = "none"; // Hide save until processed
          processbutton.style.display = "inline-block";
          processandrenderbutton.style.display = "none"; // Video buttons hidden by default
          renderfpslabel.style.display = "none";
@@ -926,7 +1035,6 @@
 
     // Initial state setup
     resetState(); // Set initial button states etc.
-    savebutton.style.display = "none"; // Hide save until image is processed or video rendered
 
   </script>
 </body>
