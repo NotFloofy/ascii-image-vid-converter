@@ -1,281 +1,503 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>custom ascii converter</title>
-  <script>
-    if (/mobi|android/i.test(navigator.userAgent)) {
-      let meta = document.createElement("meta")
-      meta.name = "viewport"
-      meta.content = "width=device-width,initial-scale=1,minimum-scale=0.1,maximum-scale=5,user-scalable=yes"
-      document.getElementsByTagName("head")[0].appendChild(meta)
-    }
-  </script>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      margin: 0;
-      background: #0a0a0a;
-      color: #e0e0e0;
-      font-family: monospace;
+    :root{
+      --bg:#06070a;
+      --panel:#0b1620;
+      --muted:#95a3af;
+      --primary1:#0b6fb0;
+      --primary2:#0078bf;
+      --accent:#00d4ff;
+      --glass: rgba(255,255,255,0.02);
+      --radius:12px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", "Courier New", monospace;
     }
-    .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1em;
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#020205);color:#e6eef6;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    .site{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      padding:20px;
+      align-items:center;
+      justify-content:flex-start;
     }
-    button,
-    input {
-      background: #003366;
-      border: none;
-      color: #e0e0e0;
-      padding: 0.5em 1em;
-      margin: 0.5em;
-      font-size: 1em;
-      border-radius: 4px;
-      transition: background 0.3s;
+
+    .header{
+      width:100%;
+      max-width:1200px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
     }
-    button:hover,
-    input:hover {
-      background: #005599;
+
+    .panel{
+      width:100%;
+      max-width:1200px;
+      background:linear-gradient(180deg,var(--panel),#07101a);
+      border-radius:var(--radius);
+      box-shadow:0 14px 40px rgba(2,6,23,0.7);
+      padding:14px;
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
     }
-    pre {
-      white-space: pre;
-      font-size: 1em;
-      line-height: 1em;
-      margin: 0;
-      padding: 1em;
-      width: 90%;
-      overflow-x: auto;
+
+    .topcontrols{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
     }
-    #progresscontainer {
-      width: 80%;
-      background: #333;
-      border-radius: 5px;
-      margin: 1em 0;
-      display: none;
+    .left{
+      display:flex;
+      gap:12px;
+      align-items:center;
     }
-    #progressbar {
-      height: 20px;
-      width: 0%;
-      background: #005599;
-      border-radius: 5px;
-      transition: width 0.2s;
+    .inputfile{
+      padding:8px 10px;
+      background:#071a2a;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.03);
+      color:#e6eef6;
+      cursor:pointer;
+      font-size:14px;
     }
-    #progressmessage {
-      margin: 0.5em;
-      font-size: 0.9em;
+    .num{
+      width:120px;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.03);
+      background:#071a2a;
+      color:#e6eef6;
+    }
+
+    .btn{
+      padding:10px 14px;
+      border-radius:10px;
+      border:0;
+      cursor:pointer;
+      font-weight:700;
+      color:#fff;
+      background:linear-gradient(90deg,var(--primary1),var(--primary2));
+      box-shadow: 0 8px 20px rgba(3,80,140,0.16);
+    }
+    .btn.secondary{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.04);
+      color:var(--muted);
+      font-weight:700;
+    }
+
+    .meta{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .previewwrap{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      margin-top:6px;
+    }
+    .previewbox{
+      width:100%;
+      height:58vh;
+      min-height:260px;
+      max-height:78vh;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:10px;
+      overflow:hidden;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .previewtop{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+
+    .asciicontainer{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      background:rgba(0,0,0,0.02);
+      border-radius:8px;
+      padding:6px;
+      position:relative;
+    }
+
+    pre#display{
+      margin:0;
+      padding:0;
+      font-family:var(--mono);
+      color:#e6eef6;
+      line-height:1;
+      white-space:pre;
+      transform-origin:0 0;
+      overflow:auto;
+    }
+
+    #progresscontainer{
+      width:100%;
+      height:10px;
+      background:rgba(255,255,255,0.03);
+      border-radius:8px;
+      overflow:hidden;
+      display:none;
+    }
+    #progressbar{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,var(--accent),#66f2ff);
+      transition:width .12s linear;
+    }
+    #progressmessage{color:var(--muted);font-size:13px}
+
+    @media (max-width:900px){
+      .previewbox{height:52vh}
+      .num{width:100%}
+      .left{flex-direction:column;align-items:flex-start}
     }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
-  <div class="container">
-    <h3>custom ascii converter</h3>
-    <label>
-      select file
-      <input type="file" id="mediainput" accept="image/*,video/*">
-    </label>
-    <label>
-      detail size columns
-      <input type="number" id="detailsize" value="200" min="50" step="50">
-    </label>
-    <div>
-      <button id="customprocess">process</button>
-      <button id="savecustom">save ascii</button>
-      <button id="togglecolour">colour mode off</button>
+  <div class="site">
+    <div class="header">
+      <div style="color:#cfe9ff;font-weight:800">custom ascii converter</div>
+      <div class="meta" id="filemeta">no file selected</div>
     </div>
-    <div id="progresscontainer">
-      <div id="progressbar"></div>
+
+    <div class="panel">
+      <div class="topcontrols">
+        <div class="left">
+          <label class="inputfile">
+            select file
+            <input id="mediainput" type="file" accept="image/*,video/*" style="display:none">
+          </label>
+
+          <input id="detailsize" class="num" type="number" min="50" step="50" value="200" title="columns">
+
+          <button id="customprocess" class="btn">process</button>
+          <button id="savecustom" class="btn">save ascii</button>
+          <button id="togglecolour" class="btn secondary">colour mode off</button>
+        </div>
+
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <div id="info" class="meta">preview at bottom, will fit to view</div>
+          <div id="progressmessage" class="meta"></div>
+        </div>
+      </div>
+
+      <div class="previewwrap">
+        <div id="progresscontainer"><div id="progressbar"></div></div>
+
+        <div class="previewbox" aria-live="polite">
+          <div class="previewtop">
+            <div class="meta">ascii preview (zoom-to-fit)</div>
+            <div class="meta" id="previewmeta"></div>
+          </div>
+
+          <div class="asciicontainer" id="asciicontainer">
+            <pre id="display" aria-hidden="false"></pre>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="progressmessage"></div>
-    <pre id="display"></pre>
   </div>
+
   <script>
-    let custommedia = null
-    let customctx = null
-    let customcanvas = document.createElement("canvas")
-    let custommediatype = null
-    let usecolour = false
-    let asciiData = []
-    const charset = ".,-~:;=!*#$@"
-    const display = document.getElementById("display")
-    const progresscontainer = document.getElementById("progresscontainer")
-    const progressbar = document.getElementById("progressbar")
-    const progressmessage = document.getElementById("progressmessage")
+    let custommedia = null;
+    let customctx = null;
+    let customcanvas = document.createElement('canvas');
+    let recordingCanvas = document.createElement('canvas');
+    let recordingCtx = recordingCanvas.getContext('2d');
+    let custommediatype = null;
+    let usecolour = false;
+    let asciiData = [];
+    const charset = ".,-~:;=!*#$@";
+    const display = document.getElementById('display');
+    const asciicontainer = document.getElementById('asciicontainer');
+    const progresscontainer = document.getElementById('progresscontainer');
+    const progressbar = document.getElementById('progressbar');
+    const progressmessage = document.getElementById('progressmessage');
+    const filemeta = document.getElementById('filemeta');
+    const previewmeta = document.getElementById('previewmeta');
 
-    // create a hidden canvas for recording the ascii view
-    let recordingCanvas = document.createElement("canvas")
-    let recordingCtx = recordingCanvas.getContext("2d")
-    recordingCanvas.style.display = "none"
-    document.body.appendChild(recordingCanvas)
+    recordingCanvas.style.display = 'none';
+    document.body.appendChild(recordingCanvas);
 
-    // render ascii art on both the display (via innerHTML) and the recording canvas
-    function customrender () {
-      let detail = parseInt(document.getElementById("detailsize").value) || 200
-      let aspect = 1
-      if (custommedia.videoWidth && custommedia.videoHeight) {
-        aspect = custommedia.videoHeight / custommedia.videoWidth
-      } else if (custommedia.naturalWidth && custommedia.naturalHeight) {
-        aspect = custommedia.naturalHeight / custommedia.naturalWidth
-      }
-      customcanvas.width = detail
-      customcanvas.height = Math.floor(detail * aspect)
-      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height)
-      let imgdata = customctx.getImageData(0, 0, customcanvas.width, customcanvas.height).data
-      asciiData = []
-      let htmlout = ""
-      for (let y = 0; y < customcanvas.height; y++) {
-        let row = []
-        for (let x = 0; x < customcanvas.width; x++) {
-          let i = (y * customcanvas.width + x) * 4
-          let r = imgdata[i]
-          let g = imgdata[i + 1]
-          let b = imgdata[i + 2]
-          let brightness = 0.299 * r + 0.587 * g + 0.114 * b
-          let charindex = Math.floor((brightness / 255) * (charset.length - 1))
-          let char = charset.charAt(charindex)
-          if (usecolour) {
-            row.push({char: char, color: "rgb(" + r + "," + g + "," + b + ")"})
-            htmlout += "<span style=\"color: rgb(" + r + "," + g + "," + b + ")\">" + char + "</span>"
+    function setMeta(text){ filemeta.textContent = text || 'no file selected'; previewmeta.textContent = text || ''; }
+
+    function renderAsciiOnce(){
+      if (!custommedia || !customctx) return;
+      const detail = Math.max(50, parseInt(document.getElementById('detailsize').value) || 200);
+      let aspect = 1;
+      if (custommediatype === 'video' && custommedia.videoWidth && custommedia.videoHeight) aspect = custommedia.videoHeight / custommedia.videoWidth;
+      if (custommediatype === 'image' && custommedia.naturalWidth && custommedia.naturalHeight) aspect = custommedia.naturalHeight / custommedia.naturalWidth;
+      customcanvas.width = detail;
+      customcanvas.height = Math.max(1, Math.floor(detail * aspect));
+      customctx.drawImage(custommedia, 0, 0, customcanvas.width, customcanvas.height);
+
+      const img = customctx.getImageData(0,0,customcanvas.width,customcanvas.height).data;
+      asciiData = [];
+      let out = '';
+      for (let y=0;y<customcanvas.height;y++){
+        let row = [];
+        for (let x=0;x<customcanvas.width;x++){
+          const i = (y*customcanvas.width + x)*4;
+          const r = img[i], g = img[i+1], b = img[i+2];
+          const brightness = 0.299*r + 0.587*g + 0.114*b;
+          const idx = Math.floor((brightness/255)*(charset.length-1));
+          const ch = charset.charAt(idx);
+          if (usecolour){
+            row.push({char:ch, color:`rgb(${r},${g},${b})`});
+            out += `<span style="color: rgb(${r},${g},${b})">${ch}</span>`;
           } else {
-            row.push({char: char, color: "#e0e0e0"})
-            htmlout += char
+            row.push({char:ch, color:'#e6eef6'});
+            out += ch;
           }
         }
-        asciiData.push(row)
-        htmlout += "<br>"
+        asciiData.push(row);
+        out += '\n';
       }
-      display.innerHTML = htmlout
+      display.innerHTML = out;
 
-      // update the recording canvas to match the ascii art
-      recordingCanvas.width = customcanvas.width * 10 * 0.6  // scale factor for clarity
-      recordingCanvas.height = customcanvas.height * 12     // approximate line height
-      recordingCtx.fillStyle = "#0a0a0a"
-      recordingCtx.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height)
-      recordingCtx.font = "10px monospace"
-      for (let y = 0; y < asciiData.length; y++) {
-        for (let x = 0; x < asciiData[y].length; x++) {
-          let obj = asciiData[y][x]
-          recordingCtx.fillStyle = obj.color
-          recordingCtx.fillText(obj.char, x * 10 * 0.6, (y + 1) * 12)
+      const fontSize = 10;
+      recordingCanvas.width = Math.max(120, customcanvas.width * fontSize * 0.6);
+      recordingCanvas.height = Math.max(120, customcanvas.height * (fontSize * 1.2));
+      recordingCtx.fillStyle = '#06070a';
+      recordingCtx.fillRect(0,0,recordingCanvas.width,recordingCanvas.height);
+      recordingCtx.font = `${fontSize}px monospace`;
+      for (let y=0;y<asciiData.length;y++){
+        for (let x=0;x<asciiData[y].length;x++){
+          const obj = asciiData[y][x];
+          recordingCtx.fillStyle = obj.color;
+          recordingCtx.fillText(obj.char, x * fontSize * 0.6, (y+1) * fontSize * 1.2);
         }
       }
 
-      if (custommediatype === "video") {
-        requestAnimationFrame(customrender)
-      }
+      fitPreviewToContainer();
     }
 
-    // record the ascii rendering in real time using MediaRecorder from the recording canvas
-    function recordAsciiVideo () {
-      // try using a mp4 mimeType if supported
-      let options = {mimeType: "video/mp4;codecs=avc1.42E01E"}
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        options = {mimeType: "video/mp4"}
-      }
-      let stream = recordingCanvas.captureStream()
-      let recorder = new MediaRecorder(stream, options)
-      let chunks = []
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) chunks.push(e.data)
-      }
-      recorder.onstop = () => {
-        let blob = new Blob(chunks, {type: options.mimeType})
-        saveAs(blob, "ascii_art.mp4")
-      }
-      // use video duration if available, else default to 5 seconds
-      let totalTime = custommediatype === "video" && custommedia.duration ? custommedia.duration * 1000 : 5000
-      let startTime = Date.now()
-      recorder.start()
-      progresscontainer.style.display = "block"
-      let progressInterval = setInterval(() => {
-        let elapsed = Date.now() - startTime
-        let percent = Math.min(Math.floor((elapsed / totalTime) * 100), 100)
-        let remaining = Math.max(totalTime - elapsed, 0)
-        progressbar.style.width = percent + "%"
-        progressmessage.textContent = "time: " + Math.floor(elapsed/1000) + " sec done, " + Math.floor(remaining/1000) + " sec left, " + percent + "%"
-        if (elapsed >= totalTime) {
-          clearInterval(progressInterval)
-          recorder.stop()
-          progressmessage.textContent = "encoding complete"
-          setTimeout(() => {
-            progresscontainer.style.display = "none"
-            progressmessage.textContent = ""
-          }, 2000)
-        }
-      }, 500)
+    function fitPreviewToContainer(){
+      if (!asciiData || asciiData.length === 0) return;
+      const cols = asciiData[0].length;
+      const rows = asciiData.length;
+      const containerW = asciicontainer.clientWidth - 6;
+      const containerH = asciicontainer.clientHeight - 6;
+      const fontSizeByWidth = containerW / (cols * 0.6);
+      const fontSizeByHeight = containerH / (rows * 1.2);
+      let fontSize = Math.floor(Math.min(fontSizeByWidth, fontSizeByHeight));
+      if (fontSize < 4) fontSize = 4;
+      if (fontSize > 18) fontSize = Math.min(fontSize, 18);
+      display.style.fontSize = fontSize + 'px';
+      display.style.lineHeight = '1';
+      display.style.margin = '0 auto';
+      if (!usecolour) display.style.color = '#e6eef6';
     }
 
-    document.getElementById("customprocess").addEventListener("click", () => {
-      const fileinput = document.getElementById("mediainput")
-      if (fileinput.files.length === 0) return
-      let file = fileinput.files[0]
-      let url = URL.createObjectURL(file)
-      if (file.type.startsWith("image")) {
-        custommediatype = "image"
-        document.getElementById("savecustom").textContent = "save ascii"
-        custommedia = new Image()
-        custommedia.onload = () => {
-          customcanvas = document.createElement("canvas")
-          customctx = customcanvas.getContext("2d")
-          customrender()
-        }
-        custommedia.src = url
-      } else if (file.type.startsWith("video")) {
-        custommediatype = "video"
-        document.getElementById("savecustom").textContent = "render"
-        custommedia = document.createElement("video")
-        custommedia.crossOrigin = "anonymous"
-        custommedia.autoplay = true
-        custommedia.loop = false
-        custommedia.muted = true
-        custommedia.onloadeddata = () => {
-          customcanvas = document.createElement("canvas")
-          customctx = customcanvas.getContext("2d")
-          customrender()
-        }
-        custommedia.src = url
-        custommedia.play()
+    let liveId = null;
+    function startLivePreview(){
+      if (liveId) cancelAnimationFrame(liveId);
+      function tick(){
+        if (!custommedia) return;
+        renderAsciiOnce();
+        if (custommediatype === 'video' && !custommedia.paused) liveId = requestAnimationFrame(tick);
       }
-    })
+      liveId = requestAnimationFrame(tick);
+    }
 
-    document.getElementById("savecustom").addEventListener("click", () => {
-      if (custommediatype === "video") {
-        recordAsciiVideo()
+    document.getElementById('customprocess').addEventListener('click', () => {
+      const f = document.getElementById('mediainput').files[0];
+      if (!f) return;
+      setMeta(`${f.name} • ${Math.round(f.size/1024)}KB`);
+      if (f.type.startsWith('image')){
+        custommediatype = 'image';
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          custommedia = img;
+          customcanvas = document.createElement('canvas');
+          customctx = customcanvas.getContext('2d');
+          renderAsciiOnce();
+        };
+        img.src = URL.createObjectURL(f);
+      } else if (f.type.startsWith('video')){
+        custommediatype = 'video';
+        const vid = document.createElement('video');
+        vid.crossOrigin = 'anonymous';
+        vid.muted = true;
+        vid.playsInline = true;
+        vid.controls = false;
+        vid.loop = false;
+        vid.onloadeddata = () => {
+          custommedia = vid;
+          customcanvas = document.createElement('canvas');
+          customctx = customcanvas.getContext('2d');
+          vid.play().catch(()=>{ });
+          startLivePreview();
+        };
+        vid.src = URL.createObjectURL(f);
       } else {
-        // for images, just save a snapshot
-        let rows = asciiData.length
-        let cols = asciiData[0].length
-        let fontsize = 10
-        let lineheight = fontsize * 1.2
-        let canvasw = cols * fontsize * 0.6
-        let canvash = rows * lineheight
-        let offcanvas = document.createElement("canvas")
-        offcanvas.width = canvasw
-        offcanvas.height = canvash
-        let offctx = offcanvas.getContext("2d")
-        offctx.fillStyle = "#0a0a0a"
-        offctx.fillRect(0, 0, canvasw, canvash)
-        offctx.font = fontsize + "px monospace"
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            let obj = asciiData[y][x]
-            offctx.fillStyle = obj.color
-            offctx.fillText(obj.char, x * fontsize * 0.6, (y + 1) * lineheight)
+        setMeta('unsupported file');
+      }
+    });
+
+    document.querySelector('.inputfile').addEventListener('click', () => {
+      document.getElementById('mediainput').click();
+    });
+    document.getElementById('mediainput').addEventListener('change', () => {
+      const f = document.getElementById('mediainput').files[0];
+      if (f) setMeta(`${f.name} • ${Math.round(f.size/1024)}KB`);
+    });
+
+    document.getElementById('togglecolour').addEventListener('click', function(){
+      usecolour = !usecolour;
+      this.textContent = usecolour ? 'colour mode on' : 'colour mode off';
+      if (custommedia) renderAsciiOnce();
+    });
+
+    document.getElementById('savecustom').addEventListener('click', async () => {
+      if (!custommedia) return;
+      if (custommediatype === 'image'){
+        if (!asciiData.length) renderAsciiOnce();
+        const rows = asciiData.length;
+        const cols = asciiData[0].length;
+        const fontSize = 10;
+        const lineHeight = fontSize * 1.2;
+        const canvasw = Math.max(120, Math.round(cols * fontSize * 0.6));
+        const canvash = Math.max(120, Math.round(rows * lineHeight));
+        const off = document.createElement('canvas');
+        off.width = canvasw;
+        off.height = canvash;
+        const ctx = off.getContext('2d');
+        ctx.fillStyle = '#06070a';
+        ctx.fillRect(0,0,canvasw,canvash);
+        ctx.font = `${fontSize}px monospace`;
+        for (let y=0;y<rows;y++){
+          for (let x=0;x<cols;x++){
+            const obj = asciiData[y][x];
+            ctx.fillStyle = obj.color;
+            ctx.fillText(obj.char, x * fontSize * 0.6, (y+1) * lineHeight);
           }
         }
-        offcanvas.toBlob(blob => {
-          saveAs(blob, "ascii_art.png")
-        })
+        off.toBlob(b => saveAs(b, 'ascii_art.png'));
+        return;
       }
-    })
 
-    document.getElementById("togglecolour").addEventListener("click", function () {
-      usecolour = !usecolour
-      this.textContent = usecolour ? "colour mode on" : "colour mode off"
-      if (custommedia) customrender()
-    })
+      progresscontainer.style.display = 'block';
+      progressbar.style.width = '0%';
+      progressmessage.textContent = 'initializing render...';
+
+      renderAsciiOnce();
+
+      const captureFps = 60;
+      const supportedMimeCandidates = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ];
+      let mime = supportedMimeCandidates.find(m => {
+        try { return MediaRecorder.isTypeSupported(m); } catch(e){ return false; }
+      }) || 'video/webm';
+
+      const stream = (recordingCanvas.captureStream) ? recordingCanvas.captureStream(captureFps) : recordingCanvas.captureStream();
+      const chunks = [];
+      let recorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: mime });
+      } catch(e){
+        recorder = new MediaRecorder(stream);
+      }
+      recorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mime });
+        saveAs(blob, 'ascii_art.webm');
+      };
+
+      try { custommedia.pause(); custommedia.currentTime = 0; } catch(e){}
+
+      recorder.start();
+
+      await custommedia.play().catch(()=>{ });
+
+      await new Promise(resolve => {
+        const duration = custommedia.duration || 0;
+        let lastMediaTime = -1;
+        let frameCount = 0;
+        function handleFrame(now, metadata){
+          try {
+            renderAsciiOnce();
+          } catch(e){ }
+
+          const t = Math.min(custommedia.currentTime || 0, duration);
+          const pct = duration ? Math.floor((t / duration) * 100) : 0;
+          progressbar.style.width = pct + '%';
+          progressmessage.textContent = `time: ${Math.floor(t)}s / ${Math.floor(duration)}s, ${pct}%`;
+
+          frameCount++;
+          if (duration && custommedia.currentTime < duration - 0.015 && !custommedia.ended) {
+            if ('requestVideoFrameCallback' in custommedia) {
+              try { custommedia.requestVideoFrameCallback(handleFrame); } catch(err){ requestAnimationFrame(handleFrame); }
+            } else {
+              requestAnimationFrame(handleFrame);
+            }
+          } else {
+            renderAsciiOnce();
+            progressbar.style.width = '100%';
+            progressmessage.textContent = 'finalizing encode...';
+            setTimeout(() => {
+              try { recorder.stop(); } catch(e){}
+              setTimeout(() => {
+                progresscontainer.style.display = 'none';
+                progressmessage.textContent = '';
+                resolve();
+              }, 700);
+            }, 200);
+          }
+        }
+
+        if ('requestVideoFrameCallback' in custommedia) {
+          try { custommedia.requestVideoFrameCallback(handleFrame); }
+          catch(e){ requestAnimationFrame(handleFrame); }
+        } else {
+          requestAnimationFrame(handleFrame);
+        }
+      });
+
+    });
+
+    document.getElementById('detailsize').addEventListener('change', () => {
+      if (custommedia) renderAsciiOnce();
+    });
+
+    function saveAs(blob, filename){
+      if (window.saveAs && typeof window.saveAs === 'function'){
+        try { window.saveAs(blob, filename); return; } catch(e){}
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename || 'download';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    }
+
+    customctx = customcanvas.getContext('2d');
   </script>
 </body>
-  </html>
+</html>
