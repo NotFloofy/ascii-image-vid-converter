@@ -412,6 +412,12 @@
       progressbar.style.width = '0%';
       progressmessage.textContent = 'initializing render...';
 
+      
+      recordingCanvas.style.display = 'block';
+      recordingCanvas.style.position = 'absolute';
+      recordingCanvas.style.opacity = '0';
+      recordingCanvas.style.pointerEvents = 'none';
+
       renderAsciiOnce({updateDom:false, drawRecording:true});
 
       const captureFps = 60;
@@ -427,11 +433,14 @@
       const stream = (recordingCanvas.captureStream) ? recordingCanvas.captureStream(captureFps) : recordingCanvas.captureStream();
       const chunks = [];
       let recorder;
+      
       try {
-        recorder = new MediaRecorder(stream, { mimeType: mime });
+        
+        recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
       } catch(e){
         recorder = new MediaRecorder(stream);
       }
+      
       recorder.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: mime });
@@ -442,11 +451,15 @@
         document.body.appendChild(a);
         a.click();
         setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1500);
+        
+        
+        recordingCanvas.style.display = 'none';
       };
 
       try { custommedia.pause(); custommedia.currentTime = 0; } catch(e){}
 
-      recorder.start();
+      
+      recorder.start(100);
 
       isRecording = true;
       domThrottle = 8;
@@ -464,12 +477,9 @@
           const pct = duration ? Math.floor((t / duration) * 100) : 0;
           progressbar.style.width = pct + '%';
           progressmessage.textContent = `time: ${Math.floor(t)}s / ${Math.floor(duration)}s, ${pct}%`;
-          if (duration && custommedia.currentTime < duration - 0.015 && !custommedia.ended) {
-            if ('requestVideoFrameCallback' in custommedia) {
-              try { custommedia.requestVideoFrameCallback(() => handleFrame()); } catch(err){ requestAnimationFrame(handleFrame); }
-            } else {
-              requestAnimationFrame(handleFrame);
-            }
+          
+          if (duration && custommedia.currentTime < duration - 0.05 && !custommedia.ended) {
+            requestAnimationFrame(handleFrame);
           } else {
             renderAsciiOnce({updateDom:false, drawRecording:true});
             progressbar.style.width = '100%';
@@ -483,15 +493,12 @@
                 domThrottle = 1;
                 resolve();
               }, 700);
-            }, 200);
+            }, 500);
           }
         }
-        if ('requestVideoFrameCallback' in custommedia) {
-          try { custommedia.requestVideoFrameCallback(() => handleFrame()); }
-          catch(e){ requestAnimationFrame(handleFrame); }
-        } else {
-          requestAnimationFrame(handleFrame);
-        }
+        
+        
+        requestAnimationFrame(handleFrame);
       });
 
     });
